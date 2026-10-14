@@ -1,0 +1,29 @@
+{
+  "name": "personal-museum-media-gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "deploy": "cf deploy",
+    "r2:mirror": "node scripts/r2.mjs mirror",
+    "r2:manifest": "node scripts/r2.mjs manifest --upload"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
+    "idb": "^8.0.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.183.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "beta",
+    "@vitejs/plugin-react": "^5.2.0",
+    "cf": "^1.0.0-beta.13",
+    "vite": "^7.3.1"
+  }
+}
