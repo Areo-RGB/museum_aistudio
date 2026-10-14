@@ -7,7 +7,7 @@ Superpowers gates. Treat explicit user instructions as authoritative.
 commit pushed to `origin/main` and `npm run deploy`, without asking first.
 
 After each completed implementation:
-- Run `npm test` and `npm run build`; fix failures before shipping.
+- Run `npm run check` after every edit (strict typecheck, `vp lint`, `vp fmt --check`, `vp test` Vitest suite, `vp build`); fix failures before shipping.
 - Verify affected behavior in the browser, including media loading and controls.
 - Commit the completed work and push to `origin/main` automatically.
 - Fetch and reconcile remote changes first. Preserve remote history; never force

@@ -25,3 +25,11 @@ release. Add a tool name to select part of the graph. For example, run
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
+
+## Project Validation
+
+There is no global `vp` installation here; run the toolchain through the
+project's npm scripts or `npm exec -- vp <command>`. After every edit, run
+`npm run check` (strict `tsc` typecheck, Oxlint, Oxfmt check, `vp test` Vitest
+suite, `vp build`) and fix failures before finishing. Do not commit or push
+unless asked.
