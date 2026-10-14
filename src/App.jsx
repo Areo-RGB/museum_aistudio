@@ -1,11 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import * as THREE from 'three';
 import './styles.css';
 import { CONFIG } from './config.js';
-import { deviceProfile } from './core/deviceProfile.js';
 import { createLayout } from './world/layout.js';
-import { buildHall, setupAtmosphere } from './world/environment.js';
-import { Lobby } from './world/lobby.js';
 import { MediaFrame } from './world/frame.js';
 import { CinemaHall } from './world/cinema.js';
 import { MediaLibrary } from './media/library.js';
@@ -17,13 +13,9 @@ import {
   HALL_OF_FAME_FLOOR,
   HALL_OF_FAME_ITEMS,
 } from './fame/programme.js';
-import { PlayerController } from './controls/player.js';
-import { createCollisionChecker } from './controls/collision.js';
-import { Interactions } from './controls/interactions.js';
-import { CinematicTour } from './controls/tour.js';
 import { BackgroundMusic } from './ui/music.js';
 
-import { MuseumCanvas } from './components/MuseumCanvas.jsx';
+import { MuseumCanvas } from './components/r3f/MuseumCanvas.jsx';
 import { Overlay } from './components/Overlay.jsx';
 import { TouchControls } from './components/TouchControls.jsx';
 import { FloorPanel } from './components/FloorPanel.jsx';
@@ -37,51 +29,22 @@ const PROGRAMME_SECTIONS = [
 ];
 
 export function App() {
-  const canvasRef = useRef(null);
-
-  // App proxy mimicking core App interface for R3F compatibility
-  const appProxyRef = useRef({
-    renderer: null,
-    camera: new THREE.PerspectiveCamera(
-      CONFIG.render.fov,
-      typeof window !== 'undefined' ? window.innerWidth / window.innerHeight : 1,
-      0.05,
-      220
-    ),
-    scene: new THREE.Scene(),
-    canvas: null,
-    profile: deviceProfile({
-      coarsePointer: matchMedia('(pointer: coarse)').matches,
-      width: window.innerWidth,
-      deviceMemory: navigator.deviceMemory,
-      saveData: navigator.connection?.saveData,
-    }),
-    get maxAnisotropy() {
-      return Math.min(
-        this.profile.anisotropy,
-        this.renderer?.capabilities.getMaxAnisotropy() || 8
-      );
-    },
-    mediaOptions: CONFIG.media,
-  });
-
-  // Core state
+  // Core application state
+  const [library, setLibrary] = useState(null);
   const [collectionSize, setCollectionSize] = useState(null);
   const [floors, setFloors] = useState([]);
   const [currentFloorIndex, setCurrentFloorIndex] = useState(0);
+  const [layout, setLayout] = useState(null);
+  const [frames, setFrames] = useState([]);
+  const [curator, setCurator] = useState(null);
+  const [cinemaHall, setCinemaHall] = useState(null);
+
+  // UI state
   const [mode, setMode] = useState('intro'); // 'intro'|'explore'|'panel'|'touring'|'riding'|'watching'
   const [activePanel, setActivePanel] = useState('none'); // 'none'|'floors'|'cinema'|'editor'
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [enterLabel, setEnterLabel] = useState('Enter the gallery');
   const [hasCinema, setHasCinema] = useState(false);
-
-  // Declarative R3F Scene State
-  const [worldState, setWorldState] = useState({
-    environment: null,
-    lobby: null,
-    cinema: null,
-    frames: [],
-  });
 
   // Cinema playback state
   const [cinemaState, setCinemaState] = useState({
@@ -91,7 +54,7 @@ export function App() {
     isWatching: false,
   });
 
-  // Editor state
+  // Editor drawer state
   const [editorState, setEditorState] = useState({
     frame: null,
     isBusy: false,
@@ -101,105 +64,76 @@ export function App() {
   // HUD state
   const [hoverCaption, setHoverCaption] = useState(null);
   const [loadingProgress, setLoadingProgress] = useState({ pending: 0, done: 0 });
-  const [isTouring, setIsTouring] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Audio & touch state
+  // Audio and mobile touch state
   const [musicState, setMusicState] = useState({ wanted: true, playing: false });
   const [touchAvailable, setTouchAvailable] = useState(false);
   const [touchVisible, setTouchVisible] = useState(false);
 
-  // Internal mutable refs for 3D world objects and listeners
-  const engineRef = useRef({
-    app: appProxyRef.current,
-    library: null,
-    floors: [],
-    currentFloor: 0,
-    layout: null,
-    environment: null,
-    frames: [],
-    curator: null,
-    atmosphere: null,
-    ambientBase: null,
-    lobby: null,
-    cinema: null,
-    player: null,
-    tour: null,
-    interactions: null,
-    music: null,
-    mode: 'intro',
-    activePanel: 'none',
-    toastTimer: null,
-  });
+  // 3D scene bridge references
+  const playerRef = useRef(null);
+  const tourRef = useRef(null);
+  const lobbyRef = useRef(null);
+  const atmosphereRef = useRef(null);
+  const musicRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
   const showToast = useCallback((msg, ms = 2400) => {
     setToastMessage(msg);
-    clearTimeout(engineRef.current.toastTimer);
-    engineRef.current.toastTimer = setTimeout(() => {
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage('');
     }, ms);
   }, []);
 
-  const setWatchingUI = useCallback((watching) => {
-    document.body.classList.toggle('cinema-watching', watching);
-    setCinemaState((prev) => ({ ...prev, isWatching: watching }));
-    engineRef.current.cinema?.videoScreen.setInteractive(watching);
-  }, []);
+  const setWatchingUI = useCallback(
+    (watching) => {
+      document.body.classList.toggle('cinema-watching', watching);
+      setCinemaState((prev) => ({ ...prev, isWatching: watching }));
+      cinemaHall?.videoScreen?.setInteractive(watching);
+    },
+    [cinemaHall]
+  );
 
   const startWatching = useCallback(() => {
-    const { cinema, app, player } = engineRef.current;
-    if (!cinema || !app?.camera) return;
+    if (!cinemaHall) return;
     setActivePanel('none');
     setOverlayVisible(false);
     setMode('watching');
-    engineRef.current.mode = 'watching';
-    engineRef.current.activePanel = 'none';
 
-    player.standUp();
-    player.clearInput();
-    player.enabled = false;
-    player.unlock();
+    playerRef.current?.standUp?.();
+    playerRef.current?.clearInput?.();
+    playerRef.current?.unlock?.();
 
-    app.camera.position.copy(cinema.viewingPosition());
-    app.camera.lookAt(cinema.lookAtScreen());
-    player.syncFromCamera();
     setHoverCaption(null);
     setWatchingUI(true);
-  }, [setWatchingUI]);
+  }, [cinemaHall, setWatchingUI]);
 
   const leaveWatching = useCallback(() => {
     setWatchingUI(false);
     setMode('explore');
-    engineRef.current.mode = 'explore';
-    const { player } = engineRef.current;
-    player.syncFromCamera();
-    player.enabled = true;
-    player.lock();
+    playerRef.current?.syncFromCamera?.();
+    playerRef.current?.lock?.();
   }, [setWatchingUI]);
 
   const closePanel = useCallback(
     (resume) => {
-      const { activePanel: currentPanel, cinema, curator, player } = engineRef.current;
-      if (currentPanel === 'cinema' && cinema?.film) {
+      if (activePanel === 'cinema' && cinemaHall?.film) {
         startWatching();
         return;
       }
       setActivePanel('none');
-      engineRef.current.activePanel = 'none';
       if (curator) curator.preferredFrame = null;
       setMode('explore');
-      engineRef.current.mode = 'explore';
-      if (player) {
-        player.enabled = true;
-        if (resume) {
-          player.lock();
-        } else {
-          setEnterLabel('Continue');
-          setOverlayVisible(true);
-        }
+      if (resume) {
+        playerRef.current?.lock?.();
+      } else {
+        setEnterLabel('Continue');
+        setOverlayVisible(true);
       }
     },
-    [startWatching]
+    [activePanel, cinemaHall, curator, startWatching]
   );
 
   const openPanel = useCallback(
@@ -208,16 +142,10 @@ export function App() {
       setOverlayVisible(false);
       setMode('panel');
       setActivePanel(panelType);
-      engineRef.current.mode = 'panel';
-      engineRef.current.activePanel = panelType;
       setHoverCaption(null);
 
-      const { player } = engineRef.current;
-      if (player) {
-        player.unlock();
-        player.clearInput();
-        player.enabled = false;
-      }
+      playerRef.current?.unlock?.();
+      playerRef.current?.clearInput?.();
 
       if (panelType === 'editor') {
         const frame = args[0];
@@ -232,293 +160,185 @@ export function App() {
   );
 
   const startTour = useCallback(() => {
-    const { cinema, player, tour } = engineRef.current;
-    if (cinema) {
+    if (cinemaHall) {
       setOverlayVisible(false);
       openPanel('cinema');
       return;
     }
     setMode('touring');
-    engineRef.current.mode = 'touring';
-    player.standUp();
-    player.enabled = false;
-    player.clearInput();
-    player.unlock();
+    playerRef.current?.standUp?.();
+    playerRef.current?.clearInput?.();
+    playerRef.current?.unlock?.();
     setHoverCaption(null);
-    setIsTouring(true);
-    tour.start();
-  }, [openPanel]);
+    tourRef.current?.start?.();
+  }, [cinemaHall, openPanel]);
 
   const stopTour = useCallback(() => {
-    const { tour, player } = engineRef.current;
-    tour.stop();
-    setIsTouring(false);
-    player.syncFromCamera();
-    player.enabled = true;
+    tourRef.current?.stop?.();
+    playerRef.current?.syncFromCamera?.();
     setMode('explore');
-    engineRef.current.mode = 'explore';
-    player.lock();
+    playerRef.current?.lock?.();
   }, []);
 
   const placeInElevator = useCallback(() => {
-    const { player, app, lobby } = engineRef.current;
-    if (!app?.camera) return;
-    player.standUp();
-    player.velocity.set(0, 0, 0);
-    player.keys.clear();
-    app.camera.position.fromArray(lobby.cabinPosition);
-    player.euler.set(0, lobby.cabinYaw, 0);
-    app.camera.quaternion.setFromEuler(player.euler);
+    playerRef.current?.standUp?.();
+    playerRef.current?.clearInput?.();
+    if (lobbyRef.current) {
+      playerRef.current?.euler?.set(0, lobbyRef.current.cabinYaw, 0);
+    }
   }, []);
 
   const showFloors = useCallback(() => {
-    if (engineRef.current.mode === 'riding') return;
-    if (engineRef.current.mode === 'touring') {
-      engineRef.current.tour.stop();
-      setIsTouring(false);
-      engineRef.current.player.enabled = true;
-      engineRef.current.player.syncFromCamera();
+    if (mode === 'riding') return;
+    if (mode === 'touring') {
+      tourRef.current?.stop?.();
+      playerRef.current?.syncFromCamera?.();
     }
     setOverlayVisible(false);
-    engineRef.current.lobby?.openDoors();
+    lobbyRef.current?.openDoors?.();
     openPanel('floors');
-  }, [openPanel]);
+  }, [mode, openPanel]);
 
-  const createCinema = useCallback(() => {
-    const { layout, atmosphere, ambientBase } = engineRef.current;
-    const app = appProxyRef.current;
-    const cinema = new CinemaHall(app, layout.cinema, {
-      setAmbient(factor) {
-        if (atmosphere?.hemisphere) {
-          atmosphere.hemisphere.intensity = ambientBase.hemisphere * factor;
-        }
-        if (app.scene) {
-          app.scene.environmentIntensity = ambientBase.env * factor;
-        }
-      },
-    });
-    cinema.onChange = () => {
-      setCinemaState({
-        nowPlaying: cinema.nowPlaying,
-        loading: cinema.loading,
-        film: cinema.film,
-        isWatching: engineRef.current.mode === 'watching',
-      });
-    };
-    engineRef.current.cinema = cinema;
-    setHasCinema(true);
-    return cinema;
-  }, []);
-
+  // Switch to a chosen floor
   const switchFloor = useCallback(
-    (index, initial = false) => {
-      const eng = engineRef.current;
-      const { floors: allFloors } = eng;
-      const app = appProxyRef.current;
-      if (!allFloors[index] || (!initial && index === eng.currentFloor)) return;
+    (index, targetLibrary, targetFloors) => {
+      const activeLib = targetLibrary || library;
+      const allFloors = targetFloors || floors;
+      if (!allFloors[index]) return;
 
       closePanel(true);
       setWatchingUI(false);
-      eng.cinema?.dispose();
-      eng.cinema = null;
+
+      cinemaHall?.dispose?.();
+      setCinemaHall(null);
       setHasCinema(false);
       setCinemaState({ nowPlaying: null, loading: null, film: null, isWatching: false });
 
-      eng.curator?.dispose();
-      for (const frame of eng.frames) frame.dispose();
+      curator?.dispose?.();
+      for (const frame of frames) frame.dispose?.();
 
-      if (!initial) {
-        eng.environment?.dispose();
-        eng.layout = createLayout(allFloors[index]);
-        eng.environment = buildHall(app, eng.layout);
-      }
+      const newLayout = createLayout(allFloors[index]);
+      const newFrames = newLayout.slots.map((slot) => new MediaFrame(slot));
 
-      eng.currentFloor = index;
-      setCurrentFloorIndex(index);
-
-      eng.frames = eng.layout.slots.map((slot) => new MediaFrame(slot));
-
-      eng.curator = new Curator(eng.frames, eng.library, {
-        media: app.mediaOptions,
-        anisotropy: Math.min(8, app.maxAnisotropy),
+      const newCurator = new Curator(newFrames, activeLib, {
+        media: CONFIG.media,
+        anisotropy: 8,
         onProgress: (p) => {
           setLoadingProgress(p);
-          if (eng.activePanel === 'editor') {
-            setEditorState((prev) => ({ ...prev, frame: prev.frame }));
-          }
         },
       });
 
-      eng.interactions.clear();
-      eng.interactions.addOccluders(eng.environment.walls);
-      for (const frame of eng.frames) {
-        eng.interactions.add(frame.hitTargets, {
-          caption: () =>
-            frame.item && {
-              title: frame.item.title,
-              subtitle: `${frame.item.subtitle} · click to curate`,
+      let newCinema = null;
+      if (newLayout.cinema) {
+        newCinema = new CinemaHall(
+          { camera: null, maxAnisotropy: 8, scene: null },
+          newLayout.cinema,
+          {
+            setAmbient(factor) {
+              if (atmosphereRef.current) {
+                atmosphereRef.current.intensity = 0.75 * factor;
+              }
             },
-          activate: () => openPanel('editor', frame),
-        });
+          }
+        );
+        newCinema.onChange = () => {
+          setCinemaState({
+            nowPlaying: newCinema.nowPlaying,
+            loading: newCinema.loading,
+            film: newCinema.film,
+            isWatching: mode === 'watching',
+          });
+        };
+        setCinemaHall(newCinema);
+        setHasCinema(true);
       }
 
-      eng.lobby.registerInteractions(eng.interactions, showFloors);
+      setCurrentFloorIndex(index);
+      setLayout(newLayout);
+      setFrames(newFrames);
+      setCurator(newCurator);
 
-      if (eng.layout.cinema) {
-        const cinema = createCinema();
-        cinema.registerInteractions(eng.interactions, {
-          onScreen: () => openPanel('cinema'),
-          onSeat: (seat) => eng.player.sit(seat),
-        });
-      }
-
-      eng.player.standUp();
-      eng.player.velocity.set(0, 0, 0);
-      eng.player.keys.clear();
-
-      const collides = createCollisionChecker(eng.layout.colliders, CONFIG.player.radius);
-      eng.player.collides = (position) =>
-        collides(position) || eng.lobby.blocksDoor(position, CONFIG.player.radius);
-
-      if (app.camera) {
-        app.camera.position.fromArray(eng.layout.start.position);
-        eng.player.euler.set(0, eng.layout.start.yaw, 0);
-        app.camera.quaternion.setFromEuler(eng.player.euler);
-      }
-
-      eng.tour.setFrames(eng.frames);
-      eng.lobby.setCurrent(index);
+      playerRef.current?.standUp?.();
+      playerRef.current?.clearInput?.();
+      tourRef.current?.setFrames?.(newFrames);
 
       setLoadingProgress({ pending: 0, done: 0 });
-      eng.curator.hangAll();
-
-      // Update declarative R3F world state
-      setWorldState({
-        environment: eng.environment,
-        lobby: eng.lobby,
-        cinema: eng.cinema,
-        frames: eng.frames,
-      });
+      newCurator.hangAll();
     },
-    [closePanel, createCinema, openPanel, setWatchingUI, showFloors]
+    [library, floors, closePanel, setWatchingUI, cinemaHall, curator, frames, mode]
   );
 
   const rideElevator = useCallback(
     (index) => {
-      const eng = engineRef.current;
-      const { floors: allFloors } = eng;
-      if (eng.mode === 'riding' || !allFloors[index]) return;
-      if (index === eng.currentFloor) {
+      if (mode === 'riding' || !floors[index]) return;
+      if (index === currentFloorIndex) {
         closePanel(true);
         return;
       }
       closePanel(true);
       setMode('riding');
-      eng.mode = 'riding';
-      eng.player.enabled = false;
       placeInElevator();
-      showToast(`Elevator · ${allFloors[index].label}`, 2600);
+      showToast(`Elevator · ${floors[index].label}`, 2600);
+      lobbyRef.current?.closeDoors?.();
 
-      eng.lobby.travelTo(
-        index,
-        () => {
-          switchFloor(index);
-          placeInElevator();
-        },
-        () => {
+      setTimeout(() => {
+        switchFloor(index);
+        placeInElevator();
+
+        setTimeout(() => {
+          lobbyRef.current?.openDoors?.();
           setMode('explore');
-          eng.mode = 'explore';
-          eng.player.enabled = true;
           showToast(
-            eng.cinema
+            floors[index].kind === 'cinema'
               ? 'Arrived · The Little Cinema · click the screen to choose a film'
-              : `Arrived · ${allFloors[index].label}`,
-            eng.cinema ? 4200 : 2400
+              : `Arrived · ${floors[index].label}`,
+            floors[index].kind === 'cinema' ? 4200 : 2400
           );
-          if (!eng.player.active) {
+          if (!playerRef.current?.active) {
             setEnterLabel('Continue');
             setOverlayVisible(true);
           }
-        }
-      );
+        }, 600);
+      }, 1200);
     },
-    [closePanel, placeInElevator, showToast, switchFloor]
+    [mode, floors, currentFloorIndex, closePanel, placeInElevator, showToast, switchFloor]
   );
 
-  // Initialize the 3D gallery data and controllers
+  // Initialize Media Library & Hall of Fame once
   useEffect(() => {
     let mounted = true;
-    const eng = engineRef.current;
-    const app = appProxyRef.current;
+    setTouchAvailable(matchMedia('(pointer: coarse)').matches);
 
     async function init() {
-      setTouchAvailable(app.profile.touch);
-
-      const library = await MediaLibrary.load(CONFIG.media.manifestUrl, {
+      const lib = await MediaLibrary.load(CONFIG.media.manifestUrl, {
         hidden: CONFIG.media.hidden,
       });
       if (!mounted) return;
-      eng.library = library;
 
-      const floorList = library.floors();
-      library.add([...HALL_OF_FAME_ITEMS, HALL_OF_FAME_FEATURE]);
+      const floorList = lib.floors();
+      lib.add([...HALL_OF_FAME_ITEMS, HALL_OF_FAME_FEATURE]);
       floorList.unshift(HALL_OF_FAME_FLOOR);
       floorList.push(CINEMA_FLOOR);
 
-      eng.floors = floorList;
+      setLibrary(lib);
       setFloors(floorList);
-      setCollectionSize(library.size);
+      setCollectionSize(lib.size);
 
-      eng.currentFloor = 0;
-      eng.layout = createLayout(floorList[0]);
-      eng.environment = buildHall(app, eng.layout);
-      eng.atmosphere = setupAtmosphere(app);
-      eng.ambientBase = {
-        hemisphere: eng.atmosphere.hemisphere.intensity,
-        env: 0.32,
-      };
-
-      eng.lobby = new Lobby(floorList);
-
-      eng.player = new PlayerController(app.camera, app.canvas, {
-        ...CONFIG.player,
-        start: eng.layout.start,
-        collides: createCollisionChecker(eng.layout.colliders, CONFIG.player.radius),
-      });
-
-      eng.tour = new CinematicTour(app.camera, eng.frames, {
-        ...CONFIG.tour,
-        eyeHeight: CONFIG.player.eyeHeight,
-      });
-
-      eng.interactions = new Interactions(app.camera);
-
-      eng.music = new BackgroundMusic(BACKGROUND_MUSIC_URL, {
+      musicRef.current = new BackgroundMusic(BACKGROUND_MUSIC_URL, {
         onChange: ({ wanted, playing }) => {
           setMusicState({ wanted, playing });
         },
       });
 
-      switchFloor(0, true);
+      switchFloor(0, lib, floorList);
 
-      // Devtools exposure
       if (import.meta.env.DEV) {
         Object.assign(window, {
           museum: {
-            app,
-            library,
+            library: lib,
             floors: floorList,
-            tour: eng.tour,
-            player: eng.player,
-            lobby: eng.lobby,
-            music: eng.music,
             switchFloor,
             rideElevator,
-            get cinema() { return eng.cinema; },
-            get layout() { return eng.layout; },
-            get frames() { return eng.frames; },
-            get curator() { return eng.curator; },
-            get currentFloor() { return eng.currentFloor; },
           },
         });
       }
@@ -528,53 +348,13 @@ export function App() {
 
     return () => {
       mounted = false;
-      eng.cinema?.dispose();
-      eng.curator?.dispose();
-      for (const frame of eng.frames) frame.dispose();
-      eng.environment?.dispose();
-    };
-  }, [createCinema, rideElevator, switchFloor]);
-
-  // Sync eng.overlayVisible
-  useEffect(() => {
-    engineRef.current.overlayVisible = overlayVisible;
-  }, [overlayVisible]);
-
-  // Pointer lock change listener
-  useEffect(() => {
-    const onPointerLockChange = () => {
-      const eng = engineRef.current;
-      if (!eng.player?.active && eng.mode === 'explore') {
-        setHoverCaption(null);
-        setEnterLabel('Continue');
-        setOverlayVisible(true);
-      }
-    };
-    document.addEventListener('pointerlockchange', onPointerLockChange);
-    return () => {
-      document.removeEventListener('pointerlockchange', onPointerLockChange);
+      cinemaHall?.dispose?.();
+      curator?.dispose?.();
+      for (const frame of frames) frame.dispose?.();
     };
   }, []);
 
-  // Canvas click listener
-  const handleCanvasClick = useCallback(() => {
-    const eng = engineRef.current;
-    if (eng.mode === 'touring') {
-      stopTour();
-      return;
-    }
-    if (eng.mode !== 'explore') return;
-    if (eng.player?.touchEnabled) return;
-    if (!eng.player?.locked) {
-      setOverlayVisible(false);
-      eng.player?.lock();
-      return;
-    }
-    const picked = eng.interactions?.pick();
-    picked?.target.activate(picked.hit);
-  }, [stopTour]);
-
-  // Global keydown listener
+  // Global keydown shortcuts
   useEffect(() => {
     const onKeyDown = (e) => {
       if (
@@ -584,72 +364,53 @@ export function App() {
       ) {
         return;
       }
-      const eng = engineRef.current;
       if (e.code === 'KeyM') {
         showFloors();
         return;
       }
       if (e.code === 'KeyB') {
-        eng.music?.toggle();
+        musicRef.current?.toggle();
         showToast(
-          eng.music?.wanted ? 'Background music on · B to stop' : 'Background music off'
+          musicRef.current?.wanted ? 'Background music on · B to stop' : 'Background music off'
         );
         return;
       }
-      if (e.code === 'Escape' && eng.mode === 'watching') {
+      if (e.code === 'Escape' && mode === 'watching') {
         leaveWatching();
         return;
       }
-      if (e.code === 'Escape' && eng.mode === 'panel') {
+      if (e.code === 'Escape' && mode === 'panel') {
         closePanel(false);
         return;
       }
-      if (e.code === 'Escape' && eng.mode === 'touring') {
+      if (e.code === 'Escape' && mode === 'touring') {
         stopTour();
         return;
       }
-      if (e.code === 'KeyC' && (eng.mode === 'explore' || eng.mode === 'touring')) {
-        if (eng.mode === 'touring') stopTour();
+      if (e.code === 'KeyC' && (mode === 'explore' || mode === 'touring')) {
+        if (mode === 'touring') stopTour();
         else {
           setOverlayVisible(false);
           startTour();
         }
         return;
       }
-      if (e.code === 'KeyR' && (eng.mode === 'explore' || eng.mode === 'touring')) {
-        eng.curator?.shuffleAll();
+      if (e.code === 'KeyR' && (mode === 'explore' || mode === 'touring')) {
+        curator?.shuffleAll();
         showToast('Rehanging the gallery…');
         return;
       }
-      if (
-        e.code === 'Space' &&
-        eng.cinema?.film &&
-        (eng.cinema.contains(appProxyRef.current.camera?.position) || eng.activePanel === 'cinema')
-      ) {
+      if (e.code === 'Space' && cinemaHall?.film && (mode === 'watching' || activePanel === 'cinema')) {
         e.preventDefault();
-        eng.cinema.togglePause();
+        cinemaHall.togglePause();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [closePanel, leaveWatching, showFloors, showToast, startTour, stopTour]);
+  }, [mode, activePanel, cinemaHall, curator, closePanel, leaveWatching, showFloors, showToast, startTour, stopTour]);
 
-  // Handle window resize camera sync during cinema watching
-  useEffect(() => {
-    const onResize = () => {
-      const eng = engineRef.current;
-      const app = appProxyRef.current;
-      if (eng.mode !== 'watching' || !eng.cinema || !app?.camera) return;
-      app.camera.position.copy(eng.cinema.viewingPosition());
-      app.camera.lookAt(eng.cinema.lookAtScreen());
-      eng.player.syncFromCamera();
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  // Frame curation handlers
+  // Frame curation editor handlers
   const handleEditorRun = async (action, successMsg) => {
     setEditorState((prev) => ({ ...prev, isBusy: true }));
     try {
@@ -671,35 +432,29 @@ export function App() {
 
   const handleUpload = (file) => {
     const frame = editorState.frame;
-    if (!frame) return;
+    if (!frame || !curator) return;
     handleEditorRun(
-      () => engineRef.current.curator.upload(frame, file),
+      () => curator.upload(frame, file),
       `Saved “${file.name}” to this frame.`
     );
   };
 
   const handleShuffle = () => {
     const frame = editorState.frame;
-    if (!frame) return;
-    handleEditorRun(
-      () => engineRef.current.curator.shuffle(frame),
-      'New piece hung.'
-    );
+    if (!frame || !curator) return;
+    handleEditorRun(() => curator.shuffle(frame), 'New piece hung.');
   };
 
   const handleReset = () => {
     const frame = editorState.frame;
-    if (!frame) return;
-    handleEditorRun(
-      () => engineRef.current.curator.reset(frame),
-      'Upload removed.'
-    );
+    if (!frame || !curator) return;
+    handleEditorRun(() => curator.reset(frame), 'Upload removed.');
   };
 
   const handleFit = (fit) => {
     const frame = editorState.frame;
-    if (!frame) return;
-    handleEditorRun(() => engineRef.current.curator.setFit(frame, fit));
+    if (!frame || !curator) return;
+    handleEditorRun(() => curator.setFit(frame, fit));
   };
 
   const currentFloor = floors[currentFloorIndex];
@@ -709,23 +464,46 @@ export function App() {
 
   return (
     <>
-      {/* Declarative React Three Fiber Canvas Renderer */}
+      {/* Declarative React Three Fiber Canvas and Scene */}
       <MuseumCanvas
-        canvasRef={canvasRef}
-        onClick={handleCanvasClick}
-        appProxy={appProxyRef.current}
-        environment={worldState.environment}
-        lobby={worldState.lobby}
-        cinema={worldState.cinema}
-        frames={worldState.frames}
-        player={engineRef.current.player}
-        tour={engineRef.current.tour}
-        curator={engineRef.current.curator}
-        interactions={engineRef.current.interactions}
+        layout={layout}
+        floors={floors}
+        currentFloorIndex={currentFloorIndex}
+        frames={frames}
+        curator={curator}
+        cinemaHall={cinemaHall}
         mode={mode}
         overlayVisible={overlayVisible}
-        setHoverCaption={setHoverCaption}
+        onOpenFloors={showFloors}
+        onOpenProgramme={() => openPanel('cinema')}
+        onFrameClick={(frame) => openPanel('editor', frame)}
+        onSitSeat={(seat) => playerRef.current?.sit?.(seat)}
+        onPointerLockChange={(locked) => {
+          if (!locked && mode === 'explore') {
+            setHoverCaption(null);
+            setEnterLabel('Continue');
+            setOverlayVisible(true);
+          }
+        }}
+        onHoverCaption={setHoverCaption}
         setTouchVisible={setTouchVisible}
+        stopTour={stopTour}
+        playerRef={playerRef}
+        tourRef={tourRef}
+        lobbyRef={lobbyRef}
+        atmosphereRef={atmosphereRef}
+        onCanvasClick={() => {
+          if (mode === 'touring') {
+            stopTour();
+            return;
+          }
+          if (mode !== 'explore') return;
+          if (playerRef.current?.touchEnabled) return;
+          if (!playerRef.current?.locked) {
+            setOverlayVisible(false);
+            playerRef.current?.lock?.();
+          }
+        }}
       />
 
       {/* Welcome / Paused Overlay */}
@@ -737,11 +515,7 @@ export function App() {
         onEnter={() => {
           setOverlayVisible(false);
           setMode('explore');
-          engineRef.current.mode = 'explore';
-          if (engineRef.current.player) {
-            engineRef.current.player.enabled = true;
-            engineRef.current.player.lock();
-          }
+          playerRef.current?.lock?.();
         }}
         onTour={() => {
           setOverlayVisible(false);
@@ -751,15 +525,14 @@ export function App() {
         onWatchCinema={() => openPanel('cinema')}
       />
 
-      {/* Touch controls for coarse pointer / mobile devices */}
+      {/* Touch controls for mobile devices */}
       <TouchControls
         visible={touchVisible}
-        player={engineRef.current.player}
-        canvasRef={canvasRef}
+        player={playerRef.current}
         onUse={() => {
-          if (engineRef.current.mode === 'explore') {
-            const picked = engineRef.current.interactions?.pick();
-            picked?.target.activate(picked.hit);
+          if (hoverCaption) {
+            const hitFrame = frames.find((f) => f.item?.title === hoverCaption.title);
+            if (hitFrame) openPanel('editor', hitFrame);
           }
         }}
         onTour={() => {
@@ -767,12 +540,8 @@ export function App() {
           startTour();
         }}
         onPause={() => {
-          if (engineRef.current.mode !== 'explore') return;
-          const { player } = engineRef.current;
-          if (player) {
-            player.clearInput();
-            player.enabled = false;
-          }
+          if (mode !== 'explore') return;
+          playerRef.current?.clearInput?.();
           setEnterLabel('Continue');
           setOverlayVisible(true);
         }}
@@ -784,7 +553,7 @@ export function App() {
           id="cinemaButton"
           className="pill"
           onClick={() => {
-            if (mode !== 'riding' && engineRef.current.cinema) {
+            if (mode !== 'riding' && cinemaHall) {
               openPanel('cinema');
             }
           }}
@@ -800,11 +569,9 @@ export function App() {
         aria-label={musicState.playing ? 'Pause background music' : 'Play background music'}
         title="Background music (B)"
         onClick={() => {
-          engineRef.current.music?.toggle();
+          musicRef.current?.toggle();
           showToast(
-            engineRef.current.music?.wanted
-              ? 'Background music on · B to stop'
-              : 'Background music off'
+            musicRef.current?.wanted ? 'Background music on · B to stop' : 'Background music off'
           );
         }}
       >
@@ -824,11 +591,11 @@ export function App() {
         onClose={() => closePanel(false)}
       />
 
-      {/* Heads-up display: Crosshair, Hover caption, Progress bar, Tour badge, Toast */}
+      {/* Heads-up display */}
       <Hud
         hoverCaption={hoverCaption}
         loadingProgress={loadingProgress}
-        isTouring={isTouring}
+        isTouring={mode === 'touring'}
         toastMessage={toastMessage}
         isTouch={touchAvailable}
       />
@@ -854,10 +621,9 @@ export function App() {
         film={cinemaState.film}
         sections={PROGRAMME_SECTIONS}
         onSelect={(film) => {
-          const { cinema } = engineRef.current;
-          if (!cinema) return;
+          if (!cinemaHall) return;
           startWatching();
-          cinema.project(film).catch((err) => {
+          cinemaHall.project(film).catch((err) => {
             console.error(err);
           });
         }}
@@ -869,8 +635,8 @@ export function App() {
         visible={cinemaState.isWatching}
         film={cinemaState.film}
         loading={cinemaState.loading}
-        onTogglePlay={() => engineRef.current.cinema?.togglePause()}
-        onStop={() => engineRef.current.cinema?.stop()}
+        onTogglePlay={() => cinemaHall?.togglePause?.()}
+        onStop={() => cinemaHall?.stop?.()}
         onProgramme={() => openPanel('cinema')}
         onWalk={leaveWatching}
       />

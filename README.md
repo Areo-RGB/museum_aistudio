@@ -86,7 +86,14 @@ src/
   main.jsx             React entry point: mounts root App component
   App.jsx              React shell: coordinates R3F gallery lifecycle, audio, and UI state
   components/
-    MuseumCanvas.jsx   React Three Fiber Canvas, camera, lighting, and useFrame systems bridge
+    r3f/
+      MuseumCanvas.jsx       R3F Canvas root and scene orchestrator
+      MuseumEnvironment.jsx  Declarative hall architecture, floor, ceiling, walls, benches, and lighting
+      MuseumLobby.jsx        Declarative elevator shaft, cabin, animated doors, and directory
+      MuseumCinema.jsx       Declarative cinema shell, stage, seats, projector, and screen
+      MuseumFrames.jsx       Declarative framed artwork collection with proximity video streaming
+      usePlayerControls.js   Custom R3F first-person WASD/touch and collision physics hook
+      useCinematicTour.js    Custom R3F automated guided tour interpolation hook
     Overlay.jsx        Welcome and pause screen with collection stats, controls cheatsheet, and cache actions
     FloorPanel.jsx     Lobby elevator directory modal for selecting seasonal periods or the cinema
     CinemaPanel.jsx    The Little Cinema programme modal: film selection and YouTube link
