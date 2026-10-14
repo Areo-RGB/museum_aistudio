@@ -49,7 +49,7 @@ authoritative package manager and `package-lock.json` is the only committed lock
 Hosted on Cloudflare Workers (static assets) at **https://gallery.h03.uk**.
 
 ```bash
-npm run deploy   # = cf deploy: builds with Vite and uploads to the Worker
+npm run deploy   # = cf deploy: builds with Vite+ and uploads to the Worker
 ```
 
 `cloudflare.config.ts` holds the Worker settings; `domains: ['gallery.h03.uk']` attaches the custom
@@ -100,13 +100,19 @@ and collection edits remain discoverable. This is not a fully offline app.
 
 Application code is TypeScript/TSX. `App.tsx` owns application state and DOM
 panels; the single R3F `MuseumCanvas.tsx` owns the active renderer, scene,
-camera, and frame loop.
+camera, and frame loop. Tooling (Oxlint, Oxfmt, Vitest, commit hooks) is
+configured in `vite.config.js` via Vite+; the behavioral suite lives in
+`tests/` and imports the runner from `vite-plus/test`.
 
 ```
 src/
   main.tsx             React entry point
   App.tsx              application state, floor transitions, audio, and UI composition
   types.ts             shared media, floor, frame, loading, and layout-facing contracts
+  core/
+    deviceProfile.ts   conservative GPU/media budgets from viewport and memory
+  fame/
+    programme.ts       curated Hall of Fame works and background music
   components/
     r3f/
       MuseumCanvas.tsx       authoritative R3F Canvas and scene lifecycle
@@ -121,7 +127,7 @@ src/
   styles.css             museum UI and responsive layout
   world/
     layout.ts            pure floor, section, slot, wall, and collision calculations
-    environment.ts       owned atmosphere resources and architecture helpers
+    disposal.ts          owned-resource teardown for floor transitions
     lobby.ts             elevator state machine and floor naming
     frame.ts             frame assignment, fitting, loading, and owned media lifecycle
     cinema.ts            cinema playback/render binding boundary
@@ -140,7 +146,7 @@ src/
   storage/db.ts          IndexedDB persistence for uploads
 ```
 
-The current migration is documented in [`docs/migration.md`](docs/migration.md).
+The TypeScript/R3F migration is documented in [`docs/migration.md`](docs/migration.md).
 Pure layout and media calculations remain independent from rendering. R3F owns
 the WebGL lifecycle; Three.js remains available for geometry, textures,
 raycasting, video resources, and other low-level work. CSS3D is used only as a
@@ -159,9 +165,6 @@ Common extensions:
   component.
 - **A clickable world object** — register typed interaction targets with
   distance, occlusion, caption, activation, and unregister behavior.
-- **Dev inspection** — the development `window.museum` handle exposes current
-  library, floor, player, curator, cinema, and elevator operations without
-  becoming a second owner of their state.
 
 ## Media collection
 
