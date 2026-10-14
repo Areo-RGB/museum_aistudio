@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as THREE from 'three';
 import './styles.css';
 import { CONFIG } from './config.js';
 import { deviceProfile } from './core/deviceProfile.js';
@@ -41,8 +42,13 @@ export function App() {
   // App proxy mimicking core App interface for R3F compatibility
   const appProxyRef = useRef({
     renderer: null,
-    camera: null,
-    scene: null,
+    camera: new THREE.PerspectiveCamera(
+      CONFIG.render.fov,
+      typeof window !== 'undefined' ? window.innerWidth / window.innerHeight : 1,
+      0.05,
+      220
+    ),
+    scene: new THREE.Scene(),
     canvas: null,
     profile: deviceProfile({
       coarsePointer: matchMedia('(pointer: coarse)').matches,

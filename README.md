@@ -1,6 +1,6 @@
 # Hertha 03 Zehlendorf · 2014er Museum
 
-A walkable Three.js museum of the 111 images and videos described by
+A walkable React Three Fiber (R3F) 3D museum of the 111 images and videos described by
 `public/media-manifest.json`, hosted in Cloudflare R2. Choose among nine seasonal
 floors (including the undated archive) using the elevator recessed into the right-hand
 wall, its wall-mounted directory, the welcome screen, or `M`. Every asset has its own ordinary frame; a
@@ -84,8 +84,9 @@ and collection edits remain discoverable. This is not a fully offline app.
 ```
 src/
   main.jsx             React entry point: mounts root App component
-  App.jsx              React shell: coordinates Three.js gallery lifecycle, audio, and UI state
+  App.jsx              React shell: coordinates R3F gallery lifecycle, audio, and UI state
   components/
+    MuseumCanvas.jsx   React Three Fiber Canvas, camera, lighting, and useFrame systems bridge
     Overlay.jsx        Welcome and pause screen with collection stats, controls cheatsheet, and cache actions
     FloorPanel.jsx     Lobby elevator directory modal for selecting seasonal periods or the cinema
     CinemaPanel.jsx    The Little Cinema programme modal: film selection and YouTube link

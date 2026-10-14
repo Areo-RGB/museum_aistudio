@@ -25,13 +25,26 @@ function SceneBridge({
   // Synchronize R3F camera, renderer, scene, canvas into appProxy
   useEffect(() => {
     if (!appProxy) return;
+
+    if (appProxy.camera) {
+      camera.position.copy(appProxy.camera.position);
+      camera.quaternion.copy(appProxy.camera.quaternion);
+    }
+
     appProxy.camera = camera;
     appProxy.renderer = gl;
     appProxy.scene = scene;
     appProxy.canvas = gl.domElement;
 
     if (player) {
+      player.camera = camera;
       player.canvas = gl.domElement;
+    }
+    if (tour) {
+      tour.camera = camera;
+    }
+    if (interactions) {
+      interactions.camera = camera;
     }
 
     gl.outputColorSpace = THREE.SRGBColorSpace;

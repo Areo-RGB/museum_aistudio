@@ -18,8 +18,9 @@ After each completed implementation:
 
 # Architecture
 
-`main.js` composes focused modules. `MediaLibrary.floors()` derives seasonal floors
-and month sections from the manifest. `createLayout(floor)` creates one ordinary
+`main.jsx` and `App.jsx` compose the application using React Three Fiber (`@react-three/fiber` and `@react-three/drei`).
+The 3D scene is rendered declaratively via `<MuseumCanvas>` with `useFrame` driving first-person collision physics, guided tours, and distance-based media streaming.
+`MediaLibrary.floors()` derives seasonal floors and month sections from the manifest. `createLayout(floor)` creates one ordinary
 slot per asset, plus a featured duplicate. Uploads may override individual slots.
 The entrance floor (index 0) is the Hall of Fame, a curated list in
 `src/fame/programme.js` registered via `library.add()` and excluded from seasons.

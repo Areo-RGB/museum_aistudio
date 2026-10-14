@@ -21,8 +21,10 @@ export class PlayerController {
     this.touchEnabled = false;
     this.touchMove = { x: 0, z: 0 };
 
-    camera.position.fromArray(options.start.position);
-    camera.quaternion.setFromEuler(this.euler);
+    if (camera) {
+      camera.position.fromArray(options.start.position);
+      camera.quaternion.setFromEuler(this.euler);
+    }
 
     this._move = (e) => this.onMouseMove(e);
     this._down = (e) => this.keys.add(e.code);
