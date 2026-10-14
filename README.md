@@ -22,10 +22,27 @@ This prototype is derived from ideas and portions of the MIT-licensed **barisulg
 
 ## Run
 
+Node.js 24 is required (`.node-version` and the `engines` field pin the supported
+runtime).
+
 ```bash
 npm install
 npm run dev
 ```
+
+Quality and release commands:
+
+```bash
+npm run typecheck       # strict TypeScript source validation
+npm run lint            # ESLint 10, including type-aware rules
+npm run format:check    # Prettier validation
+npm test                # node:test behavioral suite
+npm run build           # Vite production build
+npm run check           # all of the gates above in release order
+```
+
+`npm run format` and `npm run lint:fix` apply safe automated fixes. npm is the
+authoritative package manager and `package-lock.json` is the only committed lockfile.
 
 ## Deploy
 
@@ -35,24 +52,24 @@ Hosted on Cloudflare Workers (static assets) at **https://gallery.h03.uk**.
 npm run deploy   # = cf deploy: builds with Vite and uploads to the Worker
 ```
 
-`cloudflare.config.ts` holds the Worker settings; `domains: ["gallery.h03.uk"]` attaches the custom
+`cloudflare.config.ts` holds the Worker settings; `domains: ['gallery.h03.uk']` attaches the custom
 domain on the `h03.uk` zone (Cloudflare manages the DNS record and certificate). Build output goes
 to `.cloudflare/output/` (git-ignored).
 
 ## Controls
 
-| Input | Action |
-| --- | --- |
-| `WASD` / arrows | walk (`Shift` to hurry) |
-| Mouse | look |
-| Click a frame | open the curator panel |
-| `M` / click the lobby elevator | choose a time period |
-| `C` | guided tour (click or `C` again to take over) |
-| `R` | rehang every frame with new random pieces (uploads stay) |
-| Click the cinema screen | open the film programme |
-| Click a seat | sit down (any movement key stands you up) |
-| `Space` | pause / resume the film (in the cinema) |
-| `Esc` | release the mouse |
+| Input                          | Action                                                   |
+| ------------------------------ | -------------------------------------------------------- |
+| `WASD` / arrows                | walk (`Shift` to hurry)                                  |
+| Mouse                          | look                                                     |
+| Click a frame                  | open the curator panel                                   |
+| `M` / click the lobby elevator | choose a time period                                     |
+| `C`                            | guided tour (click or `C` again to take over)            |
+| `R`                            | rehang every frame with new random pieces (uploads stay) |
+| Click the cinema screen        | open the film programme                                  |
+| Click a seat                   | sit down (any movement key stands you up)                |
+| `Space`                        | pause / resume the film (in the cinema)                  |
+| `Esc`                          | release the mouse                                        |
 
 On touch devices, use the left stick to walk and drag the gallery to look. Aim
 the crosshair and tap **Use** to curate, call the elevator, select a cinema film,
@@ -81,68 +98,70 @@ and collection edits remain discoverable. This is not a fully offline app.
 
 ## Project structure
 
+Application code is TypeScript/TSX. `App.tsx` owns application state and DOM
+panels; the single R3F `MuseumCanvas.tsx` owns the active renderer, scene,
+camera, and frame loop.
+
 ```
 src/
-  main.jsx             React entry point: mounts root App component
-  App.jsx              React shell: coordinates R3F gallery lifecycle, audio, and UI state
+  main.tsx             React entry point
+  App.tsx              application state, floor transitions, audio, and UI composition
+  types.ts             shared media, floor, frame, loading, and layout-facing contracts
   components/
     r3f/
-      MuseumCanvas.jsx       R3F Canvas root and scene orchestrator
-      MuseumEnvironment.jsx  Declarative hall architecture, floor, ceiling, walls, benches, and lighting
-      MuseumLobby.jsx        Declarative elevator shaft, cabin, animated doors, and directory
-      MuseumCinema.jsx       Declarative cinema shell, stage, seats, projector, and screen
-      MuseumFrames.jsx       Declarative framed artwork collection with proximity video streaming
-      usePlayerControls.js   Custom R3F first-person WASD/touch and collision physics hook
-      useCinematicTour.js    Custom R3F automated guided tour interpolation hook
-    Overlay.jsx        Welcome and pause screen with collection stats, controls cheatsheet, and cache actions
-    FloorPanel.jsx     Lobby elevator directory modal for selecting seasonal periods or the cinema
-    CinemaPanel.jsx    The Little Cinema programme modal: film selection and YouTube link
-    CinemaViewing.jsx  Cinema playback toolbar (Play/Pause, Stop, Programme, Walk around)
-    EditorPanel.jsx    Frame curation side drawer: shuffle, upload file, fit options, remove upload
-    Hud.jsx            Heads-up display: crosshair, hover captions, loading progress bar, tour badge, toasts
-    TouchControls.jsx  Virtual joystick and touch actions for mobile / touch devices
-  config.js            All tuning knobs (media limits, player speed, tour timing, rendering)
-  styles.css           Global stylesheet matching original aesthetic and responsive layouts
-  core/app.js          Renderer, scene, camera, frame loop; features plug in as systems { update(dt, app) }
-  core/deviceProfile.js Device-aware render/media budgets
+      MuseumCanvas.tsx       authoritative R3F Canvas and scene lifecycle
+      MuseumEnvironment.tsx  declarative hall architecture, atmosphere, and lighting
+      MuseumLobby.tsx        persistent elevator shaft, cabin, doors, and directory
+      MuseumCinema.tsx       declarative cinema shell, stage, seats, and screen
+      MuseumFrames.tsx        artwork frame components and interaction targets
+      usePlayerControls.ts   first-person input, collision, touch, and movement physics
+      useCinematicTour.ts    guided camera interpolation
+    *.tsx                DOM panels, HUD, overlay, editor, and touch controls
+  config.ts             typed tuning knobs and device/media budgets
+  styles.css             museum UI and responsive layout
   world/
-    layout.js          createLayout(floor): hall, month sections, frame slots, walls, colliders, cinema placement
-    environment.js     One-time atmosphere and disposable per-floor architecture
-    lobby.js           Elevator cabin with sliding doors and floor directory
-    signage.js         Canvas-drawn signs and period wall text
-    frame.js           MediaFrame: moulding, mat, media surface, caption plaque, picture light, fit modes
-    cinema.js          CinemaHall: seats, screen, drapes, projector, house lights, playback API
-    textures.js        Procedural textures (wood floor)
+    layout.ts            pure floor, section, slot, wall, and collision calculations
+    environment.ts       owned atmosphere resources and architecture helpers
+    lobby.ts             elevator state machine and floor naming
+    frame.ts             frame assignment, fitting, loading, and owned media lifecycle
+    cinema.ts            cinema playback/render binding boundary
+    signage.ts           typed canvas signage and repaint lifecycle
+    textures.ts          owned procedural textures
   media/
-    library.js         Loads the R2 manifest, derives dates/captions/periods, deals items like a shuffled deck
-    loader.js          Image/video → texture (downscaled, EXIF-aware), concurrency limiter
-    cache.js           Bounded persistent photo cache and network-first manifest fallback
-    curator.js         What hangs where (upload → assigned manifest item → fallback),
-                       and streams textures in/out by distance
+    library.ts, loader.ts, cache.ts, curator.ts
+                         manifest, typed media loading, caching, assignment, and streaming
   cinema/
-    programme.js       What the cinema can show: placeholder films + videos from the collection
-    films.js           GeneratedFilm (canvas) and VideoFilm (video + positional audio), one shared interface
-    generators.js      Procedural placeholder films (countdown leader, aurora, starfield, test card)
+    programme.ts, films.ts, generators.ts, youtube.ts, screen.ts
+                         programme metadata and playback/compositor services
   controls/
-    interactions.js    Registry of clickable things: add(meshes, { caption, activate }); walls occlude
-    player.js          Pointer lock, sliding collisions, sitting
-    tour.js            Cinematic tour
-  ui/
-    music.js           Looping background music with localStorage persistence and cinema auto-pause
-  storage/db.js        IndexedDB persistence for uploads
+    collision.ts, interactions.ts, player.ts, tour.ts
+                         pure collision and interaction registries plus movement services
+  ui/music.ts            persistent background music and cinema hold lifecycle
+  storage/db.ts          IndexedDB persistence for uploads
 ```
+
+The current migration is documented in [`docs/migration.md`](docs/migration.md).
+Pure layout and media calculations remain independent from rendering. R3F owns
+the WebGL lifecycle; Three.js remains available for geometry, textures,
+raycasting, video resources, and other low-level work. CSS3D is used only as a
+cinema iframe compositor and does not create a second WebGL renderer or loop.
 
 Common extensions:
 
-- **Hall rhythm** — `SPACING` in `world/layout.js` controls frame spacing; each month gets
-  exactly one ordinary slot per item. Colliders, lights and signage follow automatically.
-- **Different periods** (months, years, ...) — change `periodFor()` in `media/library.js`.
-- **Real films for the cinema** — add entries to `PLACEHOLDER_FILMS` in `cinema/programme.js` with
-  `source: { type: 'video', url }` (the host must send CORS headers, e.g. upload them to the R2 bucket).
-- **Something clickable** — `interactions.add(meshes, { caption: () => ({ title, subtitle }), activate })`.
-- **Another media source** — produce `MediaItem`s (see `media/library.js`) and hand them to the curator.
-- **A new per-frame behaviour** — add an object with `update(dt, app)` via `app.addSystem()`.
-- In dev builds, `window.museum` exposes `{ app, layout, frames, curator, library, tour, cinema, player }` for poking around in devtools.
+- **Hall rhythm** — change spacing in `world/layout.ts`; slot IDs remain stable
+  so upload persistence and curator assignments survive rehangs.
+- **Different periods** — update the typed `periodFor()`/floor derivation in
+  `media/library.ts`.
+- **Real films** — add a typed entry to `cinema/programme.ts`; direct video
+  hosts must send CORS headers.
+- **Another media source** — add a `MediaItem` variant in `types.ts`, then
+  implement loading/disposal in the media service rather than in a scene
+  component.
+- **A clickable world object** — register typed interaction targets with
+  distance, occlusion, caption, activation, and unregister behavior.
+- **Dev inspection** — the development `window.museum` handle exposes current
+  library, floor, player, curator, cinema, and elevator operations without
+  becoming a second owner of their state.
 
 ## Media collection
 
@@ -157,7 +176,7 @@ The bucket is filed the way the museum is built (rules in `scripts/bucket-layout
 ```
 floors/2023-1-spring/IMG_20230415_101500.jpg   one folder per seasonal floor (December → next winter)
 floors/undated/...                              no date in the file name
-hall-of-fame/...                                curated entrance-floor videos (src/fame/programme.js)
+hall-of-fame/...                                curated entrance-floor videos (src/fame/programme.ts)
 music/Twelve_White_Walls.mp3                    background music
 manifest.json                                   copy of public/media-manifest.json
 ```
@@ -178,8 +197,13 @@ node scripts/r2.mjs organize --delete-old   # remove the old keys (only those wi
 WebGL needs CORS to sample cross-origin media. The bucket has this CORS rule applied:
 
 ```json
-[{ "allowed": { "origins": ["*"], "methods": ["GET", "HEAD"], "headers": ["Range"] },
-   "exposeHeaders": ["Content-Length", "Content-Range", "ETag"], "maxAgeSeconds": 86400 }]
+[
+  {
+    "allowed": { "origins": ["*"], "methods": ["GET", "HEAD"], "headers": ["Range"] },
+    "exposeHeaders": ["Content-Length", "Content-Range", "ETag"],
+    "maxAgeSeconds": 86400
+  }
+]
 ```
 
 (`cf r2 buckets cors update <bucket> --rules '<json>'`). Restrict `origins` to your deployed domain if you prefer.
@@ -188,11 +212,23 @@ in their own browser-cache entry (R2 ignores the query string).
 
 Images are downscaled to 2048 px before upload to the GPU. Textures are only loaded within
 `loadDistance` of the visitor and freed beyond `unloadDistance`; the nearest six video textures can load at once, and videos only play while you're
-nearby (see `config.js`).
+nearby (see `config.ts`).
 
 ## Verification and workflow
 
-Run `npm test` and `npm run build` before shipping. `CLAUDE.md` records the requested
-automatic commit, push-to-main and Cloudflare deployment workflow. Browser checks
-cover all-floor manifest coverage, repeated switching, real R2 media and controls.
-Transient media failures show a retry caption and retry after five seconds.
+Run the complete quality sequence before shipping:
+
+```bash
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run build
+npm run check
+```
+
+`CLAUDE.md` records the requested automatic commit, push-to-main, Cloudflare
+deployment, and live-site verification workflow. Browser checks cover all-floor
+manifest coverage, repeated switching, real R2 media, desktop controls, and
+touch controls. Transient media failures show a retry caption and retry after
+five seconds.

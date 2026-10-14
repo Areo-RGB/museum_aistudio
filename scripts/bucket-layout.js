@@ -8,8 +8,8 @@
 //   hall-of-fame/<curated entrance-floor videos>
 //   music/<background music>
 //   manifest.json
-import { captionFor, kindOf, periodFor, UNDATED } from '../src/media/library.js';
-import { HALL_OF_FAME_FILES, HALL_OF_FAME_FOLDER, MUSIC_FOLDER } from '../src/fame/programme.js';
+import { captionFor, kindOf, periodFor, UNDATED } from '../src/media/library.ts';
+import { HALL_OF_FAME_FILES, HALL_OF_FAME_FOLDER, MUSIC_FOLDER } from '../src/fame/programme.ts';
 
 const SEASONS = ['winter', 'spring', 'summer', 'autumn'];
 

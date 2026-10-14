@@ -16,7 +16,7 @@ import { homedir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MANIFEST_KEY, publicUrl, targetKey } from './bucket-layout.js';
-import { MEDIA_BASE } from '../src/fame/programme.js';
+import { MEDIA_BASE } from '../src/fame/programme.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BUCKET = 'museum2-2014-1-001';
@@ -25,8 +25,11 @@ const CF = join(ROOT, 'node_modules', 'cf', 'bin', 'cf');
 const PAGE = 1000;
 
 function cf(...args) {
-  const out = execFileSync(process.execPath, [CF, ...args, '--bucket-name', BUCKET],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'] });
+  const out = execFileSync(process.execPath, [CF, ...args, '--bucket-name', BUCKET], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
   const start = out.search(/[[{]/);
   return start < 0 ? null : JSON.parse(out.slice(start));
 }
@@ -35,8 +38,22 @@ function cf(...args) {
 function listBucket() {
   const objects = [];
   for (let after; ;) {
-    const page = cf('r2', 'objects', 'list', '--per-page', String(PAGE), ...(after ? ['--start-after', after] : []));
-    objects.push(...page.map((o) => ({ key: o.key, size: o.size, etag: o.etag, contentType: o.http_metadata?.contentType ?? '' })));
+    const page = cf(
+      'r2',
+      'objects',
+      'list',
+      '--per-page',
+      String(PAGE),
+      ...(after ? ['--start-after', after] : []),
+    );
+    objects.push(
+      ...page.map((o) => ({
+        key: o.key,
+        size: o.size,
+        etag: o.etag,
+        contentType: o.http_metadata?.contentType ?? '',
+      })),
+    );
     if (page.length < PAGE) return objects;
     after = page.at(-1).key;
   }
@@ -45,22 +62,31 @@ function listBucket() {
 function hashFile(path, algorithm) {
   return new Promise((resolve, reject) => {
     const hash = createHash(algorithm);
-    createReadStream(path).on('data', (d) => hash.update(d)).on('end', () => resolve(hash.digest('hex'))).on('error', reject);
+    createReadStream(path)
+      .on('data', (d) => hash.update(d))
+      .on('end', () => resolve(hash.digest('hex')))
+      .on('error', reject);
   });
 }
 
 const localPath = (key) => join(MIRROR, ...key.split('/'));
-const sizeOf = (path) => stat(path).then((s) => s.size, () => -1);
+const sizeOf = (path) =>
+  stat(path).then(
+    (s) => s.size,
+    () => -1,
+  );
 
 /** True when the mirror holds this exact object (R2 etags of single-part uploads are MD5s). */
 async function matches(path, object) {
-  if (await sizeOf(path) !== object.size) return false;
-  return object.etag.includes('-') || await hashFile(path, 'md5') === object.etag;
+  if ((await sizeOf(path)) !== object.size) return false;
+  return object.etag.includes('-') || (await hashFile(path, 'md5')) === object.etag;
 }
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  const files = await Promise.all(entries.map((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)])));
+  const files = await Promise.all(
+    entries.map((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)])),
+  );
   return files.flat();
 }
 
@@ -73,8 +99,11 @@ async function removeEmptyDirs(dir) {
 
 /** `cf r2 objects get` writes the raw object to stdout; stream it to disk. */
 async function cfDownload(key, file) {
-  const child = spawn(process.execPath, [CF, 'r2', 'objects', 'get', key, '--bucket-name', BUCKET],
-    { stdio: ['ignore', 'pipe', 'inherit'] });
+  const child = spawn(
+    process.execPath,
+    [CF, 'r2', 'objects', 'get', key, '--bucket-name', BUCKET],
+    { stdio: ['ignore', 'pipe', 'inherit'] },
+  );
   const exited = new Promise((resolve, reject) => child.on('error', reject).on('close', resolve));
   await pipeline(child.stdout, createWriteStream(file));
   const code = await exited;
@@ -85,7 +114,8 @@ async function download(object, path) {
   await mkdir(dirname(path), { recursive: true });
   const partial = `${path}.part`;
   await cfDownload(object.key, partial);
-  if (!(await matches(partial, object))) throw new Error(`${object.key}: download does not match its etag`);
+  if (!(await matches(partial, object)))
+    throw new Error(`${object.key}: download does not match its etag`);
   await rename(partial, path);
 }
 
@@ -99,13 +129,19 @@ async function mirror({ prune = false } = {}) {
   const counts = { kept: 0, moved: 0, copied: 0, downloaded: 0 };
   for (const object of objects) {
     const path = localPath(object.key);
-    if (await matches(path, object)) { counts.kept++; continue; }
+    if (await matches(path, object)) {
+      counts.kept++;
+      continue;
+    }
     // Reuse an identical local file (a stray first) rather than downloading again.
     let source = null;
     for (const candidate of [...strays, ...local.filter((p) => wanted.has(p) && p !== path)]) {
-      if (await sizeOf(candidate) !== object.size) continue;
+      if ((await sizeOf(candidate)) !== object.size) continue;
       if (!hashes.has(candidate)) hashes.set(candidate, await hashFile(candidate, 'md5'));
-      if (hashes.get(candidate) === object.etag) { source = candidate; break; }
+      if (hashes.get(candidate) === object.etag) {
+        source = candidate;
+        break;
+      }
     }
     if (source) {
       await mkdir(dirname(path), { recursive: true });
@@ -119,7 +155,9 @@ async function mirror({ prune = false } = {}) {
         await copyFile(source, path);
       }
       counts[moving ? 'moved' : 'copied']++;
-      console.log(`${moving ? 'moved ' : 'copied'}     ${relative(MIRROR, source)} -> ${object.key}`);
+      console.log(
+        `${moving ? 'moved ' : 'copied'}     ${relative(MIRROR, source)} -> ${object.key}`,
+      );
     } else {
       await download(object, path);
       counts.downloaded++;
@@ -128,28 +166,40 @@ async function mirror({ prune = false } = {}) {
   }
   for (const stray of strays) {
     if (prune) await rm(stray);
-    console.log(`${prune ? 'pruned    ' : 'not in bucket (use --prune):'} ${relative(MIRROR, stray).split(sep).join('/')}`);
+    console.log(
+      `${prune ? 'pruned    ' : 'not in bucket (use --prune):'} ${relative(MIRROR, stray).split(sep).join('/')}`,
+    );
   }
   await mkdir(MIRROR, { recursive: true });
   await removeEmptyDirs(MIRROR);
   const bytes = objects.reduce((sum, o) => sum + o.size, 0);
-  console.log(`Mirror ${MIRROR}: ${objects.length} objects, ${(bytes / 1e6).toFixed(1)} MB `
-    + `(${counts.kept} up to date, ${counts.moved} moved, ${counts.copied} copied, ${counts.downloaded} downloaded).`);
+  console.log(
+    `Mirror ${MIRROR}: ${objects.length} objects, ${(bytes / 1e6).toFixed(1)} MB ` +
+      `(${counts.kept} up to date, ${counts.moved} moved, ${counts.copied} copied, ${counts.downloaded} downloaded).`,
+  );
   return objects;
 }
 
 async function organize({ apply = false, deleteOld = false } = {}) {
   const objects = await mirror();
   const byKey = new Map(objects.map((o) => [o.key, o]));
-  const moves = objects.map((o) => ({ object: o, to: targetKey(o.key, o.contentType) })).filter((m) => m.to !== m.object.key);
+  const moves = objects
+    .map((o) => ({ object: o, to: targetKey(o.key, o.contentType) }))
+    .filter((m) => m.to !== m.object.key);
   if (!moves.length) return console.log('Bucket is already organised.');
-  const collisions = moves.filter((m) => m.to && byKey.has(m.to) && byKey.get(m.to).etag !== m.object.etag);
-  if (collisions.length) throw new Error(`Different objects already at ${collisions.map((m) => m.to).join(', ')}`);
+  const collisions = moves.filter(
+    (m) => m.to && byKey.has(m.to) && byKey.get(m.to).etag !== m.object.etag,
+  );
+  if (collisions.length)
+    throw new Error(`Different objects already at ${collisions.map((m) => m.to).join(', ')}`);
 
   for (const { object, to } of moves) {
     const copied = to && byKey.get(to)?.etag === object.etag;
     if (deleteOld) {
-      if (to && !copied) { console.log(`keep   ${object.key} (no verified copy at ${to} yet)`); continue; }
+      if (to && !copied) {
+        console.log(`keep   ${object.key} (no verified copy at ${to} yet)`);
+        continue;
+      }
       cf('r2', 'objects', 'delete', object.key, '--force');
       console.log(`delete ${object.key}`);
     } else if (!to) {
@@ -157,7 +207,16 @@ async function organize({ apply = false, deleteOld = false } = {}) {
     } else if (copied) {
       console.log(`copied   ${object.key} -> ${to}`);
     } else if (apply) {
-      cf('r2', 'objects', 'put', to, '--file', localPath(object.key), '--content-type', object.contentType);
+      cf(
+        'r2',
+        'objects',
+        'put',
+        to,
+        '--file',
+        localPath(object.key),
+        '--content-type',
+        object.contentType,
+      );
       console.log(`copy     ${object.key} -> ${to}`);
     } else {
       console.log(`plan     ${object.key} -> ${to}`);
@@ -167,13 +226,17 @@ async function organize({ apply = false, deleteOld = false } = {}) {
     // Confirm every copy landed intact before anything may be deleted.
     const after = new Map(listBucket().map((o) => [o.key, o]));
     const missing = moves.filter((m) => m.to && after.get(m.to)?.etag !== m.object.etag);
-    if (missing.length) throw new Error(`Copies not verified: ${missing.map((m) => m.to).join(', ')}`);
-    console.log(`All ${moves.filter((m) => m.to).length} copies verified. Old keys stay until --delete-old.`);
+    if (missing.length)
+      throw new Error(`Copies not verified: ${missing.map((m) => m.to).join(', ')}`);
+    console.log(
+      `All ${moves.filter((m) => m.to).length} copies verified. Old keys stay until --delete-old.`,
+    );
   }
   if (deleteOld) {
     const left = new Set(listBucket().map((o) => o.key));
     const stuck = moves.filter((m) => (!m.to || left.has(m.to)) && left.has(m.object.key));
-    if (stuck.length) throw new Error(`Still in the bucket: ${stuck.map((m) => m.object.key).join(', ')}`);
+    if (stuck.length)
+      throw new Error(`Still in the bucket: ${stuck.map((m) => m.object.key).join(', ')}`);
     await mirror();
   }
 }
@@ -182,18 +245,31 @@ async function manifest({ upload = false } = {}) {
   const objects = await mirror();
   const keys = new Set(objects.map((o) => o.key));
   // Mid-reorganisation an object exists twice; list only its filed copy.
-  const listed = objects.filter((o) => /^(image|video)\//.test(o.contentType))
-    .filter((o) => { const to = targetKey(o.key, o.contentType); return to === o.key || !keys.has(to); });
+  const listed = objects
+    .filter((o) => /^(image|video)\//.test(o.contentType))
+    .filter((o) => {
+      const to = targetKey(o.key, o.contentType);
+      return to === o.key || !keys.has(to);
+    });
   const assets = [];
   for (const o of listed.sort((a, b) => a.key.localeCompare(b.key))) {
     assets.push({
-      key: o.key, url: publicUrl(MEDIA_BASE, o.key), sizeBytes: o.size, contentType: o.contentType,
-      sha256: await hashFile(localPath(o.key), 'sha256'), etag: o.etag,
+      key: o.key,
+      url: publicUrl(MEDIA_BASE, o.key),
+      sizeBytes: o.size,
+      contentType: o.contentType,
+      sha256: await hashFile(localPath(o.key), 'sha256'),
+      etag: o.etag,
     });
   }
   const doc = {
-    manifestVersion: 1, createdAtUtc: new Date().toISOString(), bucket: BUCKET, publicBaseUrl: MEDIA_BASE,
-    totalAssets: assets.length, totalBytes: assets.reduce((sum, a) => sum + a.sizeBytes, 0), assets,
+    manifestVersion: 1,
+    createdAtUtc: new Date().toISOString(),
+    bucket: BUCKET,
+    publicBaseUrl: MEDIA_BASE,
+    totalAssets: assets.length,
+    totalBytes: assets.reduce((sum, a) => sum + a.sizeBytes, 0),
+    assets,
   };
   const file = join(ROOT, 'public', 'media-manifest.json');
   await writeFile(file, `${JSON.stringify(doc, null, 2)}\n`);
@@ -212,7 +288,9 @@ const commands = {
   manifest: () => manifest({ upload: has('--upload') }),
 };
 if (!commands[command]) {
-  console.error('Usage: node scripts/r2.mjs <mirror [--prune] | organize [--apply | --delete-old] | manifest [--upload]>');
+  console.error(
+    'Usage: node scripts/r2.mjs <mirror [--prune] | organize [--apply | --delete-old] | manifest [--upload]>',
+  );
   process.exit(1);
 }
 await commands[command]();
