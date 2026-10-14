@@ -136,7 +136,8 @@ export class PlayerController implements PlayerHandle {
   }
 
   unlock(): void {
-    if (typeof document !== 'undefined' && document.pointerLockElement) {
+    if (typeof document === 'undefined') return;
+    if (document.pointerLockElement) {
       document.exitPointerLock();
     }
   }

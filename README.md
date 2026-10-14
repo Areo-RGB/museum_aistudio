@@ -34,10 +34,10 @@ Quality and release commands:
 
 ```bash
 npm run typecheck       # strict TypeScript source validation
-npm run lint            # ESLint 10, including type-aware rules
-npm run format:check    # Prettier validation
+npm run lint            # Oxlint via Vite+, including type-aware rules
+npm run format:check    # Oxfmt validation
 npm test                # node:test behavioral suite
-npm run build           # Vite production build
+npm run build           # Vite+ production build (vp build)
 npm run check           # all of the gates above in release order
 ```
 

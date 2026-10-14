@@ -5,18 +5,19 @@
   "type": "module",
   "scripts": {
     "test": "node --import tsx --test tests/*.test.js",
-    "dev": "vite --host 0.0.0.0 --port 3000",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "dev": "vp dev --host 0.0.0.0 --port 3000",
+    "build": "vp build",
+    "preview": "vp preview --host 0.0.0.0 --port 3000",
     "deploy": "cf deploy",
     "r2:mirror": "node scripts/r2.mjs mirror",
     "r2:manifest": "node scripts/r2.mjs manifest --upload",
-    "lint": "eslint . --max-warnings 0",
-    "lint:fix": "eslint . --fix",
+    "lint": "vp lint . --max-warnings 0",
+    "lint:fix": "vp lint . --fix",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build"
+    "format": "vp fmt .",
+    "format:check": "vp fmt --check .",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
+    "prepare": "vp config"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -34,7 +35,6 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "beta",
-    "@eslint/js": "^10.0.1",
     "@react-three/test-renderer": "^9.1.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
@@ -42,15 +42,13 @@
     "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "^5.2.0",
     "cf": "^1.0.0-beta.13",
-    "eslint": "^10.12.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^16.5.0",
-    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.71.2",
-    "vite": "^7.3.1"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0",
+    "vite-plus": "1.2.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0"
   }
 }
