@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { createLayout } from '../src/world/layout.ts';
 import { CINEMA_FLOOR, YOUTUBE_FILMS } from '../src/cinema/programme.ts';

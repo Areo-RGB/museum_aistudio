@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --import tsx --test tests/*.test.js",
+    "test": "vp test",
     "dev": "vp dev --host 0.0.0.0 --port 3000",
     "build": "vp build",
     "preview": "vp preview --host 0.0.0.0 --port 3000",
@@ -43,7 +43,6 @@
     "@vitejs/plugin-react": "^5.2.0",
     "cf": "^1.0.0-beta.13",
     "globals": "^16.5.0",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0",
     "vite-plus": "1.2.0"

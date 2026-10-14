@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { MediaLibrary } from '../src/media/library.ts';
 import { Curator } from '../src/media/curator.ts';

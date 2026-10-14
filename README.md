@@ -36,7 +36,7 @@ Quality and release commands:
 npm run typecheck       # strict TypeScript source validation
 npm run lint            # Oxlint via Vite+, including type-aware rules
 npm run format:check    # Oxfmt validation
-npm test                # node:test behavioral suite
+npm test                # Vitest behavioral suite (vp test)
 npm run build           # Vite+ production build (vp build)
 npm run check           # all of the gates above in release order
 ```
