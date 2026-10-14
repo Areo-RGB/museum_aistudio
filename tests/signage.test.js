@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canvasPanel } from '../src/world/signage.js';
+import { canvasPanel } from '../src/world/signage.ts';
 
 test('directory signs can repaint after the selected period changes', () => {
   const previous = globalThis.document;
@@ -16,5 +16,7 @@ test('directory signs can repaint after the selected period changes', () => {
     mesh.geometry.dispose();
     mesh.material.map.dispose();
     mesh.material.dispose();
-  } finally { globalThis.document = previous; }
+  } finally {
+    globalThis.document = previous;
+  }
 });

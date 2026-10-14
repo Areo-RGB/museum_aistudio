@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { screenCutoutMaterial, screenPose, viewingPosition } from '../src/cinema/screen.js';
+import { screenCutoutMaterial, screenPose, viewingPosition } from '../src/cinema/screen.ts';
 
 test('screen cutout reveals the iframe while preserving scene occlusion', () => {
   const material = screenCutoutMaterial();
@@ -27,7 +27,8 @@ test('CSS player uses the exact world pose and aspect ratio of the cinema surfac
   assert.equal(pose.scale.x * 1280, 6.4);
   assert.equal(pose.scale.y * 720, 3.6);
   assert.ok(pose.quaternion.angleTo(surface.getWorldQuaternion(new THREE.Quaternion())) < 1e-8);
-  surface.geometry.dispose(); surface.material.dispose();
+  surface.geometry.dispose();
+  surface.material.dispose();
 });
 
 test('phone viewing position backs up to fit the whole screen', () => {

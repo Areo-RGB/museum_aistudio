@@ -1,0 +1,20 @@
+node_modules
+dist
+build
+coverage
+.cache
+.aistudio
+.wrangler
+.cloudflare
+
+public/media
+public/media-manifest.json
+
+llms-full.txt
+llms.txt
+package-lock.json
+bun.lock
+
+# Reference material and repository instructions are not application source.
+skills
+CLAUDE.md
