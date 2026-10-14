@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CONFIG } from '../config.js';
 
 function SceneBridge({
@@ -29,10 +30,26 @@ function SceneBridge({
     appProxy.scene = scene;
     appProxy.canvas = gl.domElement;
 
+    if (player) {
+      player.canvas = gl.domElement;
+    }
+
     gl.outputColorSpace = THREE.SRGBColorSpace;
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = CONFIG.render.exposure;
-  }, [camera, gl, scene, appProxy]);
+
+    // Ensure PMREM studio reflections are generated on the active WebGLRenderer
+    if (gl && scene && !scene.environment) {
+      try {
+        const pmrem = new THREE.PMREMGenerator(gl);
+        scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        scene.environmentIntensity = 0.32;
+        pmrem.dispose();
+      } catch (err) {
+        console.warn('[R3F] Environment map generation fallback:', err);
+      }
+    }
+  }, [camera, gl, scene, appProxy, player]);
 
   // Main R3F render loop for custom controls, physics, curator, and cinema systems
   useFrame((_, delta) => {

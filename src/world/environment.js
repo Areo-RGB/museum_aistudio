@@ -36,16 +36,20 @@ const PILASTER_OFFSET = 3.1;
  * light so rooms (the cinema) can dim the house lights.
  */
 export function setupAtmosphere(app) {
-  const pmrem = new THREE.PMREMGenerator(app.renderer);
-  app.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  app.scene.environmentIntensity = 0.32;
-  app.scene.background = new THREE.Color(0x151413);
-  // Soft haze so the far end of a long hall recedes instead of ending in a hard edge.
-  app.scene.fog = new THREE.Fog(PALETTE.haze, 35, 140);
-  pmrem.dispose();
-
   const hemisphere = new THREE.HemisphereLight(0xfff6ea, 0x6d6255, 0.75);
-  app.scene.add(hemisphere);
+  if (app?.scene) {
+    app.scene.background = new THREE.Color(0x151413);
+    app.scene.fog = new THREE.Fog(PALETTE.haze, 35, 140);
+    app.scene.add(hemisphere);
+  }
+
+  if (app?.renderer) {
+    const pmrem = new THREE.PMREMGenerator(app.renderer);
+    app.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    app.scene.environmentIntensity = 0.32;
+    pmrem.dispose();
+  }
+
   return { hemisphere };
 }
 
