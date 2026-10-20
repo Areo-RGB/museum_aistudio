@@ -5,15 +5,15 @@ import type { FitMode, FrameLoadState, FrameSlot, LoadedMedia, MediaItem } from 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 const UNIT_PLANE = new THREE.PlaneGeometry(1, 1);
 const MOULDING = new THREE.MeshStandardMaterial({
-  color: 0x1c1915,
-  roughness: 0.42,
-  metalness: 0.25,
+  color: 0x141821,
+  roughness: 0.34,
+  metalness: 0.42,
 });
-const MATTE = new THREE.MeshStandardMaterial({ color: 0xf5f2ea, roughness: 0.95 });
+const MATTE = new THREE.MeshStandardMaterial({ color: 0xf7f5ef, roughness: 0.92 });
 const PLAQUE_BACK = new THREE.MeshStandardMaterial({
-  color: 0xb59a6a,
-  roughness: 0.35,
-  metalness: 0.7,
+  color: 0xc5a059,
+  roughness: 0.28,
+  metalness: 0.82,
 });
 let washMaterial: THREE.MeshBasicMaterial | null = null;
 const EMPTY_TARGETS: readonly THREE.Object3D[] = [];
@@ -333,22 +333,27 @@ function getWashMaterial(): THREE.MeshBasicMaterial {
   if (washMaterial) return washMaterial;
   if (typeof document === 'undefined') throw new Error('ArtworkFrame requires a browser canvas');
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
+  canvas.width = 512;
+  canvas.height = 512;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('ArtworkFrame could not create a 2D canvas context');
-  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
   gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+  gradient.addColorStop(0.45, 'rgba(255,255,255,0.58)');
   gradient.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 256, 256);
+  ctx.fillRect(0, 0, 512, 512);
   const map = new THREE.CanvasTexture(canvas);
+  map.generateMipmaps = true;
+  map.minFilter = THREE.LinearMipmapLinearFilter;
+  map.magFilter = THREE.LinearFilter;
   washMaterial = new THREE.MeshBasicMaterial({
     map,
-    color: 0xffd9a8,
+    color: 0xffe4b8,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.32,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -358,16 +363,22 @@ function getWashMaterial(): THREE.MeshBasicMaterial {
 function createPlaque(): FramePlaque {
   if (typeof document === 'undefined') throw new Error('ArtworkFrame requires a browser canvas');
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
+  canvas.width = 1024;
+  canvas.height = 512;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('ArtworkFrame could not create a 2D canvas context');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
+  texture.anisotropy = 16;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   const face = new THREE.MeshStandardMaterial({
     map: texture,
-    roughness: 0.6,
+    roughness: 0.48,
+    metalness: 0.12,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
@@ -381,14 +392,22 @@ function createPlaque(): FramePlaque {
     mesh,
     face: faceMesh,
     draw(title, subtitle) {
-      ctx.fillStyle = '#f3efe6';
+      // Sleek dark obsidian museum plaque with gold & Hertha blue rule
+      ctx.fillStyle = '#101622';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#1d1b18';
-      ctx.font = '600 46px "Cormorant Garamond", Georgia, serif';
-      wrapText(ctx, title, 36, 92, canvas.width - 72, 52, 2);
-      ctx.fillStyle = '#6f675b';
-      ctx.font = 'italic 32px Georgia, serif';
-      ctx.fillText(subtitle, 36, 212);
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.55)';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
+      ctx.fillStyle = '#1e56a0';
+      ctx.fillRect(68, 66, 110, 10);
+      ctx.fillStyle = '#d4af37';
+      ctx.fillRect(190, 66, 36, 10);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '600 84px "Cormorant Garamond", Georgia, serif';
+      wrapText(ctx, title, 68, 184, canvas.width - 136, 96, 2);
+      ctx.fillStyle = '#d4af37';
+      ctx.font = '500 50px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(subtitle, 68, 430);
       texture.needsUpdate = true;
     },
   };

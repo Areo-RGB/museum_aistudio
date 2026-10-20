@@ -87,3 +87,30 @@ test('pointer lock requests during entry before enabled state commits, but movem
     player.update(0.1);
     assert.deepEqual(camera.position.toArray(), settledPosition.toArray());
   }));
+
+test('mouse look damps smoothly across frames and ignores pointer-lock warp spikes', () =>
+  withBrowser((fixture) => {
+    const { canvas } = fixture;
+    const camera = new THREE.PerspectiveCamera();
+    const player = new PlayerController(camera, canvas, {
+      ...CONFIG.player,
+      start: { position: [0, CONFIG.player.eyeHeight, 0], yaw: 0 },
+    });
+    player.lock();
+
+    // A massive synthetic warp spike (> 220px) is ignored completely.
+    player.onMouseMove({ movementX: 400, movementY: -350 });
+    player.update(0.016);
+    assert.equal(player.euler.y, 0);
+    assert.equal(player.euler.x, 0);
+
+    // Normal mouse movement interpolates smoothly over frames rather than snapping all at once.
+    player.onMouseMove({ movementX: 20, movementY: 10 });
+    player.update(0.016);
+    const firstFrameYaw = player.euler.y;
+    assert.ok(firstFrameYaw < 0, 'camera begins rotating on first frame');
+    player.update(0.05);
+    assert.ok(player.euler.y < firstFrameYaw, 'camera continues smoothly damping toward target');
+
+    player.dispose();
+  }));

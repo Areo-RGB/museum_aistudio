@@ -5,29 +5,35 @@ import { LOBBY, ROOM } from '../../world/layout.ts';
 import type { BenchLayout, HallBounds, MuseumLayout, WallLayout } from '../../world/layout.ts';
 import type { FrameSlot } from '../../types.ts';
 import { canvasPanel, disposeCanvasPanel, periodLabel } from '../../world/signage.ts';
-import { createWoodFloorTexture } from '../../world/textures.ts';
+import {
+  createCarpetTexture,
+  createWoodFloorBumpTexture,
+  createWoodFloorTexture,
+} from '../../world/textures.ts';
 
 const PALETTE = {
-  wall: 0xebe7df,
+  wall: 0xefece6,
   accentWall: 0x163b68,
-  baseboard: 0x2a2621,
-  ceiling: 0xf4f2ec,
-  skylight: 0xd6d0c3,
-  coffer: 0xd9d5cc,
-  track: 0x1d1c1a,
-  benchWood: 0x6b4a2f,
-  benchMetal: 0x1e1e1e,
-  cinemaWall: 0x161214,
-  brass: 0xb08d57,
+  baseboard: 0x181c24,
+  ceiling: 0xf6f4ef,
+  skylight: 0xfdfbf7,
+  coffer: 0xdcd7cd,
+  cofferFrame: 0x232730,
+  track: 0x161920,
+  benchWood: 0x543824,
+  benchLeather: 0x13294b,
+  benchMetal: 0x1a1e26,
+  cinemaWall: 0x120f14,
+  brass: 0xc5a059,
 } as const;
 
 const FAME = {
-  wall: 0x12284a,
-  accentWall: 0x0b1a33,
-  ceiling: 0x1a2537,
-  baseboard: 0x8a6a3a,
+  wall: 0x0f2342,
+  accentWall: 0x081529,
+  ceiling: 0x0c1a30,
+  baseboard: 0x9e7b3b,
   carpet: 0x7a1420,
-  gold: 0xc9a45c,
+  gold: 0xd4af37,
 } as const;
 
 const PILASTER_OFFSET = 3.1;
@@ -40,16 +46,42 @@ function Bench({ bench }: BenchProps) {
   const { x, z, w, d } = bench;
   return (
     <group position={[x, 0, z]}>
-      <mesh position={[0, 0.45, 0]}>
-        <boxGeometry args={[w, 0.07, d]} />
-        <meshStandardMaterial color={PALETTE.benchWood} roughness={0.5} />
+      {/* Soft grounding shadow plane */}
+      <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[w + 0.24, d + 0.24]} />
+        <meshBasicMaterial color={0x000000} transparent opacity={0.22} depthWrite={false} />
       </mesh>
-      {[-d / 2 + 0.2, d / 2 - 0.2].map((legZ) => (
-        <mesh key={legZ} position={[0, 0.21, legZ]}>
-          <boxGeometry args={[w - 0.08, 0.42, 0.06]} />
-          <meshStandardMaterial color={PALETTE.benchMetal} roughness={0.4} metalness={0.6} />
+      {/* Timber base deck */}
+      <mesh position={[0, 0.4, 0]}>
+        <boxGeometry args={[w, 0.045, d]} />
+        <meshStandardMaterial color={PALETTE.benchWood} roughness={0.48} />
+      </mesh>
+      {/* Brass perimeter inlay strip */}
+      <mesh position={[0, 0.425, 0]}>
+        <boxGeometry args={[w + 0.01, 0.012, d + 0.01]} />
+        <meshStandardMaterial color={PALETTE.brass} roughness={0.28} metalness={0.85} />
+      </mesh>
+      {/* Upholstered Hertha navy leather cushion */}
+      <mesh position={[0, 0.465, 0]}>
+        <boxGeometry args={[w - 0.04, 0.068, d - 0.04]} />
+        <meshStandardMaterial color={PALETTE.benchLeather} roughness={0.42} metalness={0.08} />
+      </mesh>
+      {/* Center seam detail */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[w - 0.08, 0.004, 0.012]} />
+        <meshStandardMaterial color={PALETTE.brass} roughness={0.3} metalness={0.8} />
+      </mesh>
+      {/* Architectural sled legs & stretcher bar */}
+      {[-d / 2 + 0.22, d / 2 - 0.22].map((legZ) => (
+        <mesh key={legZ} position={[0, 0.2, legZ]}>
+          <boxGeometry args={[w - 0.12, 0.4, 0.055]} />
+          <meshStandardMaterial color={PALETTE.benchMetal} roughness={0.35} metalness={0.68} />
         </mesh>
       ))}
+      <mesh position={[0, 0.12, 0]}>
+        <boxGeometry args={[0.08, 0.04, d - 0.44]} />
+        <meshStandardMaterial color={PALETTE.benchMetal} roughness={0.35} metalness={0.68} />
+      </mesh>
     </group>
   );
 }
@@ -71,14 +103,21 @@ function CeilingFixtures({ hall, slots }: CeilingFixturesProps) {
   const first = hall.minZ + (hall.length - (count - 1) * spacing) / 2;
   const trackX = hall.maxX - 2.2;
   const metal = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: PALETTE.track, roughness: 0.45, metalness: 0.6 }),
+    () =>
+      new THREE.MeshStandardMaterial({ color: PALETTE.track, roughness: 0.38, metalness: 0.72 }),
+    [],
+  );
+  const brass = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({ color: PALETTE.brass, roughness: 0.28, metalness: 0.85 }),
     [],
   );
   useEffect(() => {
     return () => {
       metal.dispose();
+      brass.dispose();
     };
-  }, [metal]);
+  }, [brass, metal]);
 
   const spotData = useMemo<SpotData[]>(() => {
     const dummy = new THREE.Object3D();
@@ -100,11 +139,15 @@ function CeilingFixtures({ hall, slots }: CeilingFixturesProps) {
         const z = first + index * spacing;
         return (
           <group key={index} position={[0, y, z]}>
-            <mesh position={[0, -0.004, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[2.9, 2.9]} />
-              <meshStandardMaterial color={PALETTE.coffer} roughness={1} />
+            <mesh position={[0, -0.003, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[3.1, 3.1]} />
+              <meshStandardMaterial color={PALETTE.cofferFrame} roughness={0.5} metalness={0.4} />
             </mesh>
-            <mesh position={[0, -0.008, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh position={[0, -0.006, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[2.9, 2.9]} />
+              <meshStandardMaterial color={PALETTE.coffer} roughness={0.9} />
+            </mesh>
+            <mesh position={[0, -0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
               <planeGeometry args={[2.5, 2.5]} />
               <meshBasicMaterial color={PALETTE.skylight} />
             </mesh>
@@ -113,15 +156,21 @@ function CeilingFixtures({ hall, slots }: CeilingFixturesProps) {
       })}
       {[-1, 1].map((side) => (
         <mesh key={side} position={[side * trackX, y - 0.04, (hall.minZ + hall.maxZ) / 2]}>
-          <boxGeometry args={[0.05, 0.035, hall.length - 1]} />
+          <boxGeometry args={[0.06, 0.04, hall.length - 1]} />
           <primitive object={metal} attach="material" />
         </mesh>
       ))}
       {spotData.map((spot, index) => (
-        <mesh key={index} position={spot.position} rotation={spot.rotation}>
-          <cylinderGeometry args={[0.055, 0.075, 0.2, 14]} />
-          <primitive object={metal} attach="material" />
-        </mesh>
+        <group key={index} position={spot.position} rotation={spot.rotation}>
+          <mesh>
+            <cylinderGeometry args={[0.055, 0.075, 0.2, 14]} />
+            <primitive object={metal} attach="material" />
+          </mesh>
+          <mesh position={[0, -0.095, 0]}>
+            <cylinderGeometry args={[0.076, 0.076, 0.018, 14]} />
+            <primitive object={brass} attach="material" />
+          </mesh>
+        </group>
       ))}
     </group>
   );
@@ -137,12 +186,13 @@ interface DecorBox {
 }
 
 function HallOfFameDecor({ layout }: FameDecorProps) {
+  const { gl } = useThree();
   const { hall, slots } = layout;
   const face = ROOM.wall / 2;
   const carpetLength = hall.length - 3;
   const carpetZ = hall.minZ + 1 + carpetLength / 2;
   const goldMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: FAME.gold, roughness: 0.28, metalness: 0.9 }),
+    () => new THREE.MeshStandardMaterial({ color: FAME.gold, roughness: 0.25, metalness: 0.88 }),
     [],
   );
   useEffect(() => {
@@ -151,23 +201,41 @@ function HallOfFameDecor({ layout }: FameDecorProps) {
     };
   }, [goldMat]);
 
+  const carpetTexture = useMemo(() => {
+    const texture = createCarpetTexture({
+      anisotropy: gl.capabilities.getMaxAnisotropy() || 16,
+    });
+    texture.repeat.set(1.6, carpetLength / 1.6);
+    return texture;
+  }, [carpetLength, gl]);
+  useEffect(() => {
+    return () => {
+      carpetTexture.dispose();
+    };
+  }, [carpetTexture]);
+
   const titlePanel = useMemo(() => {
     const title = canvasPanel(
-      5.2,
-      0.75,
+      5.6,
+      0.85,
       (context, width, height) => {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.fillStyle = '#d8b56a';
-        context.font = `600 ${String(height * 0.56)}px "Cormorant Garamond", Georgia, serif`;
-        context.letterSpacing = '0.22em';
-        context.fillText('HALL OF FAME', width / 2, height * 0.46);
+        context.fillStyle = 'rgba(230, 200, 117, 0.82)';
+        context.font = `600 ${String(height * 0.16)}px "Outfit", sans-serif`;
+        context.letterSpacing = '0.28em';
+        context.fillText('F.C. HERTHA 03 ZEHLENDORF · JAHRGANG 2014', width / 2, height * 0.2);
+        context.fillStyle = '#e6c875';
+        context.font = `600 ${String(height * 0.5)}px "Cormorant Garamond", Georgia, serif`;
+        context.letterSpacing = '0.2em';
+        context.fillText('HALL OF FAME', width / 2, height * 0.56);
         context.letterSpacing = '0em';
-        context.font = `${String(height * 0.3)}px Georgia, serif`;
-        for (const x of [width * 0.04, width * 0.96]) context.fillText('★', x, height * 0.46);
-        context.fillRect(width * 0.2, height * 0.88, width * 0.6, height * 0.025);
+        context.font = `${String(height * 0.28)}px Georgia, serif`;
+        for (const x of [width * 0.05, width * 0.95]) context.fillText('★', x, height * 0.54);
+        context.fillStyle = '#d4af37';
+        context.fillRect(width * 0.18, height * 0.88, width * 0.64, height * 0.025);
       },
-      { lit: false, transparent: true },
+      { lit: false, transparent: true, resolution: 1536 },
     );
     title.position.set(0, hall.height - 0.58, hall.maxZ - face - 0.02);
     title.rotation.y = Math.PI;
@@ -234,11 +302,11 @@ function HallOfFameDecor({ layout }: FameDecorProps) {
   return (
     <group>
       <mesh position={[0, 0.004, carpetZ]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[2.6, carpetLength]} />
-        <meshStandardMaterial color={FAME.carpet} roughness={0.95} />
+        <planeGeometry args={[2.8, carpetLength]} />
+        <meshStandardMaterial map={carpetTexture} roughness={0.88} />
       </mesh>
       {[-1, 1].map((side) => (
-        <mesh key={side} position={[side * 1.34, 0.004, carpetZ]}>
+        <mesh key={side} position={[side * 1.44, 0.004, carpetZ]}>
           <boxGeometry args={[0.08, 0.008, carpetLength]} />
           <primitive object={goldMat} attach="material" />
         </mesh>
@@ -270,17 +338,27 @@ function MuseumEnvironmentContents({ layout }: MuseumEnvironmentContentsProps) {
   const fame = layout.theme === 'fame';
   const width = hall.maxX - hall.minX;
   const centerZ = (hall.minZ + hall.maxZ) / 2;
+  const maxAnisotropy = gl.capabilities.getMaxAnisotropy() || 16;
   const floorTexture = useMemo(() => {
-    const texture = createWoodFloorTexture({ anisotropy: gl.capabilities.getMaxAnisotropy() || 8 });
+    const texture = createWoodFloorTexture({ anisotropy: maxAnisotropy });
     texture.repeat.set(width / 1.8, hall.length / 1.8);
     texture.rotation = Math.PI / 2;
     return texture;
-  }, [gl, hall.length, width]);
+  }, [hall.length, maxAnisotropy, width]);
+
+  const floorBumpTexture = useMemo(() => {
+    const texture = createWoodFloorBumpTexture({ anisotropy: maxAnisotropy });
+    texture.repeat.set(width / 1.8, hall.length / 1.8);
+    texture.rotation = Math.PI / 2;
+    return texture;
+  }, [hall.length, maxAnisotropy, width]);
+
   useEffect(() => {
     return () => {
       floorTexture.dispose();
+      floorBumpTexture.dispose();
     };
-  }, [floorTexture]);
+  }, [floorBumpTexture, floorTexture]);
 
   const wallMaterials = useMemo(
     () => ({
@@ -343,7 +421,13 @@ function MuseumEnvironmentContents({ layout }: MuseumEnvironmentContentsProps) {
     <group name="declarative-environment">
       <mesh position={[0, 0, centerZ]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[width, hall.length]} />
-        <meshStandardMaterial map={floorTexture} roughness={0.34} metalness={0} />
+        <meshStandardMaterial
+          map={floorTexture}
+          bumpMap={floorBumpTexture}
+          bumpScale={0.0035}
+          roughness={0.36}
+          metalness={0.01}
+        />
       </mesh>
       <mesh position={[0, hall.height, centerZ]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[width, hall.length]} />

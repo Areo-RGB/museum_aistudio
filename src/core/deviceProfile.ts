@@ -53,7 +53,7 @@ export function deviceProfile({
           videoPlayDistance: 9,
         }
       : {},
-    anisotropy: constrained ? 4 : 8,
+    anisotropy: constrained ? 8 : 16,
   };
 }
 

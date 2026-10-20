@@ -161,7 +161,11 @@ function DeclarativeMuseumScene({
     },
     [interactions],
   );
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const raycaster = useMemo(() => {
+    const instance = new THREE.Raycaster();
+    instance.far = 6.5;
+    return instance;
+  }, []);
   const rayOrigin = useMemo(() => new THREE.Vector2(0, 0), []);
   const targetsRef = useRef<THREE.Object3D[]>([]);
   const ownersRef = useRef(new Map<THREE.Object3D, ArtworkFrameController>());
@@ -359,6 +363,9 @@ export function MuseumCanvas({
           alpha: true,
           antialias: profile.render.antialias,
           powerPreference: 'high-performance',
+          outputColorSpace: THREE.SRGBColorSpace,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.08,
         }}
         dpr={[1, profile.render.maxPixelRatio]}
         camera={{

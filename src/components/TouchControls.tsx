@@ -98,8 +98,8 @@ export function TouchControls({
     const onCanvasPointerMove = (event: PointerEvent): void => {
       if (!canvas || !visible || event.pointerId !== lookIdRef.current) return;
       player?.onMouseMove({
-        movementX: (event.clientX - lookXRef.current) * 1.7,
-        movementY: (event.clientY - lookYRef.current) * 1.7,
+        movementX: event.clientX - lookXRef.current,
+        movementY: event.clientY - lookYRef.current,
       });
       lookXRef.current = event.clientX;
       lookYRef.current = event.clientY;

@@ -44,10 +44,15 @@ export function canvasPanel(
   canvas.height = Math.round((resolution * height) / width);
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas 2D context is unavailable');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
+  texture.anisotropy = 16;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   let disposed = false;
   const paint = (): void => {
     if (disposed) return;
@@ -118,29 +123,37 @@ export function periodLabel(
   period: { label: string; range?: string; count?: number },
   { width = 2.6, height = 1.5, dark = false }: PeriodLabelOptions = {},
 ) {
-  const ink = dark ? '#efe6d6' : '#24211d';
-  const muted = dark ? 'rgba(239,230,214,0.65)' : 'rgba(36,33,29,0.6)';
-  const accent = '#a8834d';
+  const ink = dark ? '#f8fafc' : '#141923';
+  const muted = dark ? 'rgba(248,250,252,0.68)' : 'rgba(20,25,35,0.62)';
+  const accent = dark ? '#d4af37' : '#1e56a0';
+  const gold = '#d4af37';
   const range = period.range ?? '';
   const count = period.count ?? 0;
   return canvasPanel(width, height, (context, canvasWidth, canvasHeight) => {
     context.textAlign = 'left';
     context.fillStyle = accent;
-    context.fillRect(0, canvasHeight * 0.06, canvasWidth * 0.08, canvasHeight * 0.018);
+    context.fillRect(0, canvasHeight * 0.06, canvasWidth * 0.1, canvasHeight * 0.022);
+    context.fillStyle = gold;
+    context.fillRect(
+      canvasWidth * 0.11,
+      canvasHeight * 0.06,
+      canvasWidth * 0.03,
+      canvasHeight * 0.022,
+    );
     context.fillStyle = muted;
-    context.font = `500 ${String(canvasHeight * 0.065)}px Inter, sans-serif`;
-    context.letterSpacing = '0.2em';
-    context.fillText(range.toUpperCase(), 0, canvasHeight * 0.2);
+    context.font = `600 ${String(canvasHeight * 0.068)}px "Outfit", sans-serif`;
+    context.letterSpacing = '0.22em';
+    context.fillText(range.toUpperCase(), 0, canvasHeight * 0.21);
     context.letterSpacing = '0em';
     context.fillStyle = ink;
-    context.font = `600 ${String(canvasHeight * 0.3)}px "Cormorant Garamond", Georgia, serif`;
+    context.font = `600 ${String(canvasHeight * 0.29)}px "Cormorant Garamond", Georgia, serif`;
     context.fillText(period.label, -canvasHeight * 0.01, canvasHeight * 0.52);
     context.fillStyle = muted;
-    context.font = `italic 500 ${String(canvasHeight * 0.1)}px "Cormorant Garamond", Georgia, serif`;
+    context.font = `500 ${String(canvasHeight * 0.085)}px "Plus Jakarta Sans", sans-serif`;
     context.fillText(
-      `${String(count)} ${count === 1 ? 'work' : 'works'} in the collection`,
+      `${String(count)} ${count === 1 ? 'work' : 'works'} · Hertha 03 Archive`,
       0,
-      canvasHeight * 0.72,
+      canvasHeight * 0.73,
     );
   });
 }

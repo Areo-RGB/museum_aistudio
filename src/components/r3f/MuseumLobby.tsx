@@ -46,11 +46,11 @@ export function MuseumLobby({
 
   const materials = useMemo(
     () => ({
-      steel: new THREE.MeshStandardMaterial({ color: 0x9ba4ae, roughness: 0.38, metalness: 0.72 }),
-      dark: new THREE.MeshStandardMaterial({ color: 0x173a60, roughness: 0.7 }),
-      brass: new THREE.MeshStandardMaterial({ color: 0xbba471, roughness: 0.3, metalness: 0.8 }),
-      ceilingLight: new THREE.MeshBasicMaterial({ color: 0xfff2d7 }),
-      callLight: new THREE.MeshBasicMaterial({ color: 0xb9dbff }),
+      steel: new THREE.MeshStandardMaterial({ color: 0xa4b0bc, roughness: 0.32, metalness: 0.78 }),
+      dark: new THREE.MeshStandardMaterial({ color: 0x0f2544, roughness: 0.62, metalness: 0.15 }),
+      brass: new THREE.MeshStandardMaterial({ color: 0xc8a45c, roughness: 0.26, metalness: 0.86 }),
+      ceilingLight: new THREE.MeshBasicMaterial({ color: 0xfff5e0 }),
+      callLight: new THREE.MeshBasicMaterial({ color: 0xe6c875 }),
     }),
     [],
   );
@@ -64,38 +64,42 @@ export function MuseumLobby({
 
   const directoryMesh = useMemo(() => {
     const draw = (context: CanvasRenderingContext2D, width: number, height: number): void => {
-      context.fillStyle = '#1b1a17';
+      context.fillStyle = '#0c1322';
       context.fillRect(0, 0, width, height);
-      context.fillStyle = '#c9a873';
-      context.font = `500 ${String(width * 0.05)}px Inter, sans-serif`;
-      context.letterSpacing = '0.25em';
-      context.fillText('FLOOR DIRECTORY', width * 0.08, height * 0.07);
+      context.strokeStyle = 'rgba(212, 175, 55, 0.45)';
+      context.lineWidth = width * 0.008;
+      context.strokeRect(width * 0.025, height * 0.015, width * 0.95, height * 0.97);
+      context.fillStyle = '#d4af37';
+      context.font = `600 ${String(width * 0.046)}px "Outfit", sans-serif`;
+      context.letterSpacing = '0.24em';
+      context.fillText('HERTHA 03 · DIRECTORY', width * 0.08, height * 0.068);
       context.letterSpacing = '0em';
-      context.fillStyle = '#f1e8d8';
-      context.font = `600 ${String(width * 0.13)}px "Cormorant Garamond", Georgia, serif`;
-      context.fillText('Floors', width * 0.08, height * 0.15);
+      context.fillStyle = '#f8fafc';
+      context.font = `600 ${String(width * 0.12)}px "Cormorant Garamond", Georgia, serif`;
+      context.fillText('Seasons & Archive', width * 0.08, height * 0.145);
       const rowHeight = Math.min(height * 0.08, (height * 0.78) / Math.max(1, floors.length));
       floors.forEach((floor, index) => {
         const y = height * 0.2 + index * rowHeight;
         if (index === currentFloorIndex) {
-          context.fillStyle = 'rgba(201,168,115,0.22)';
-          context.fillRect(width * 0.04, y, width * 0.92, rowHeight * 0.9);
-          context.fillStyle = '#c9a873';
-          context.fillRect(width * 0.04, y, width * 0.012, rowHeight * 0.9);
+          context.fillStyle = 'rgba(30, 86, 160, 0.38)';
+          context.fillRect(width * 0.05, y, width * 0.9, rowHeight * 0.9);
+          context.fillStyle = '#d4af37';
+          context.fillRect(width * 0.05, y, width * 0.014, rowHeight * 0.9);
         }
-        context.fillStyle = index === currentFloorIndex ? '#f1e8d8' : 'rgba(241,232,216,0.7)';
-        context.font = `600 ${String(rowHeight * 0.42)}px Inter, sans-serif`;
-        context.fillText(floorName(index, floors), width * 0.08, y + rowHeight * 0.55);
-        context.font = `600 ${String(rowHeight * 0.5)}px "Cormorant Garamond", Georgia, serif`;
-        context.fillText(floor.label, width * 0.26, y + rowHeight * 0.58);
+        context.fillStyle = index === currentFloorIndex ? '#e6c875' : 'rgba(248,250,252,0.72)';
+        context.font = `600 ${String(rowHeight * 0.42)}px "JetBrains Mono", monospace`;
+        context.fillText(floorName(index, floors), width * 0.085, y + rowHeight * 0.56);
+        context.fillStyle = index === currentFloorIndex ? '#ffffff' : 'rgba(248,250,252,0.82)';
+        context.font = `600 ${String(rowHeight * 0.48)}px "Cormorant Garamond", Georgia, serif`;
+        context.fillText(floor.label, width * 0.25, y + rowHeight * 0.58);
         context.textAlign = 'right';
-        context.fillStyle = 'rgba(241,232,216,0.5)';
-        context.font = `500 ${String(rowHeight * 0.34)}px Inter, sans-serif`;
-        context.fillText(String(floor.count), width * 0.92, y + rowHeight * 0.55);
+        context.fillStyle = index === currentFloorIndex ? '#e6c875' : 'rgba(248,250,252,0.48)';
+        context.font = `500 ${String(rowHeight * 0.34)}px "Plus Jakarta Sans", sans-serif`;
+        context.fillText(String(floor.count), width * 0.91, y + rowHeight * 0.55);
         context.textAlign = 'left';
       });
     };
-    const mesh = canvasPanel(D.width, D.height, draw, { lit: false, resolution: 768 });
+    const mesh = canvasPanel(D.width, D.height, draw, { lit: false, resolution: 1536 });
     mesh.position.z = 0.065;
     return mesh;
   }, [currentFloorIndex, floors]);
@@ -110,19 +114,27 @@ export function MuseumLobby({
       1.6,
       0.38,
       (context, width, height) => {
-        context.fillStyle = '#0c1928';
+        context.fillStyle = '#091220';
         context.fillRect(0, 0, width, height);
-        context.fillStyle = '#e5d5ac';
+        context.strokeStyle = 'rgba(212, 175, 55, 0.55)';
+        context.lineWidth = height * 0.04;
+        context.strokeRect(
+          height * 0.06,
+          height * 0.06,
+          width - height * 0.12,
+          height - height * 0.12,
+        );
+        context.fillStyle = '#e6c875';
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.font = `500 ${String(height * 0.34)}px Inter, sans-serif`;
+        context.font = `600 ${String(height * 0.34)}px "Outfit", sans-serif`;
         context.fillText(
           `${floorName(currentFloorIndex, floors)} · ${floors[currentFloorIndex]?.label ?? 'Elevator'}`,
           width / 2,
           height / 2,
         );
       },
-      { lit: false, resolution: 768 },
+      { lit: false, resolution: 1024 },
     );
     mesh.position.set(E.x, 2.9, E.frontZ - 0.095);
     mesh.rotation.y = Math.PI;

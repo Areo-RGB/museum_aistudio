@@ -46,6 +46,9 @@ export class GeneratedFilm implements CinemaFilm {
     this.generator = factory(this.width, this.height);
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.texture.anisotropy = 16;
+    this.texture.minFilter = THREE.LinearFilter;
+    this.texture.magFilter = THREE.LinearFilter;
     this.draw();
   }
 
@@ -139,6 +142,9 @@ export class VideoFilm implements CinemaFilm {
     this.height = video.videoHeight;
     this.texture = new THREE.VideoTexture(video);
     this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.texture.anisotropy = 16;
+    this.texture.minFilter = THREE.LinearFilter;
+    this.texture.magFilter = THREE.LinearFilter;
     this.audio = new THREE.PositionalAudio(listener);
     this.audio.setMediaElementSource(video);
     this.audio.setRefDistance(7);

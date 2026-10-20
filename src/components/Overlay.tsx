@@ -41,16 +41,21 @@ export function Overlay({
   return (
     <div id="overlay" className={visible ? '' : 'hidden'}>
       <div className="panel">
-        <img className="club-logo" src="/media/logo.svg" alt="Hertha 03 Zehlendorf" />
-        <p className="eyebrow">F.C. Hertha 03 Zehlendorf · 2014er</p>
+        <div className="overlay-header">
+          <img className="club-logo" src="/media/logo.svg" alt="Hertha 03 Zehlendorf" />
+          <div className="overlay-brand-meta">
+            <p className="eyebrow">F.C. Hertha 03 Zehlendorf · 2014er</p>
+            <span className="overlay-crest-sub">Official Team Photo &amp; Match Film Pavilion</span>
+          </div>
+        </div>
         <h1>
           Our memories,
           <br />
           one season at a time.
         </h1>
         <p className="sub">
-          Explore every photograph and film from the archive. Start in the Hall of Fame, choose a
-          season at the lobby elevator, wander its monthly galleries, or take the elevator to the
+          Explore every matchday photograph and film from the club archive. Start in the Ground
+          Floor Hall of Fame, ride the pavilion elevator between seasons, or take a seat in the
           cinema.
         </p>
         <p className="count" id="collectionCount">

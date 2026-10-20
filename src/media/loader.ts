@@ -64,20 +64,22 @@ export function loadMedia(
   { maxTextureSize, anisotropy, signal }: LoadOptions,
 ): Promise<LoadedMedia> {
   if (item.kind === 'text') return loadText(item, anisotropy);
-  if (item.kind === 'video') return loadVideo(item, signal);
+  if (item.kind === 'video') return loadVideo(item, anisotropy, signal);
   return loadImage(item, maxTextureSize, anisotropy, signal);
 }
 
-/** A name lettered in gold on navy, drawn once the display serif has loaded. */
+/** A name lettered in gold on Hertha royal navy, drawn once the display serif has loaded. */
 async function loadText(item: MediaItem, anisotropy: number): Promise<LoadedMedia> {
-  const font = 'italic 600 300px "Cormorant Garamond", Georgia, serif';
+  const font = 'italic 600 350px "Cormorant Garamond", Georgia, serif';
   const fonts: unknown = Reflect.get(document, 'fonts');
   if (hasFontLoader(fonts)) await fonts.load(font).catch(() => undefined);
   const canvas = document.createElement('canvas');
-  canvas.width = 1500;
-  canvas.height = 1000;
+  canvas.width = 2048;
+  canvas.height = 1365;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Unable to create canvas context');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
   const width = canvas.width;
   const height = canvas.height;
   const glow = context.createRadialGradient(
@@ -86,24 +88,46 @@ async function loadText(item: MediaItem, anisotropy: number): Promise<LoadedMedi
     0,
     width / 2,
     height / 2,
-    width * 0.6,
+    width * 0.62,
   );
-  glow.addColorStop(0, '#1d3a66');
-  glow.addColorStop(1, '#0b1a33');
+  glow.addColorStop(0, '#1e4682');
+  glow.addColorStop(0.55, '#10264a');
+  glow.addColorStop(1, '#071124');
   context.fillStyle = glow;
   context.fillRect(0, 0, width, height);
+
+  // Double Championship Gold & Royal Blue border frame
+  context.strokeStyle = 'rgba(212, 175, 55, 0.65)';
+  context.lineWidth = 8;
+  context.strokeRect(56, 56, width - 112, height - 112);
+  context.strokeStyle = 'rgba(212, 175, 55, 0.25)';
+  context.lineWidth = 3;
+  context.strokeRect(78, 78, width - 156, height - 156);
+
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillStyle = '#d8b56a';
+  context.fillStyle = 'rgba(230, 200, 117, 0.85)';
+  context.font = '600 44px "Outfit", sans-serif';
+  context.fillText('F.C. HERTHA 03 ZEHLENDORF · HALL OF FAME', width / 2, height * 0.2);
+
+  context.fillStyle = '#e6c875';
   context.font = font;
-  context.fillText(item.text ?? item.title, width / 2, height * 0.47);
-  context.fillRect(width * 0.32, height * 0.7, width * 0.36, 5);
-  context.font = '60px Georgia, serif';
-  for (const x of [width * 0.26, width * 0.74]) context.fillText('★', x, height * 0.7);
+  context.fillText(item.text ?? item.title, width / 2, height * 0.48);
+
+  context.fillStyle = '#d4af37';
+  context.fillRect(width * 0.3, height * 0.72, width * 0.4, 6);
+  context.font = '74px Georgia, serif';
+  for (const x of [width * 0.24, width * 0.76]) context.fillText('★', x, height * 0.72);
+  context.fillStyle = 'rgba(248, 250, 252, 0.72)';
+  context.font = '500 38px "Plus Jakarta Sans", sans-serif';
+  context.fillText('JAHRGANG 2014 · CLUB LEGEND', width / 2, height * 0.82);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = anisotropy;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   return {
     texture,
     video: null,
@@ -126,7 +150,10 @@ async function loadImage(
   const blob = item.blob ?? (await photoCache.getBlob(mediaUrl(item), { signal }));
   let bitmap: ImageBitmap | undefined;
   try {
-    bitmap = await createImageBitmap(blob);
+    bitmap = await createImageBitmap(blob, {
+      imageOrientation: 'from-image',
+      resizeQuality: 'high',
+    } as ImageBitmapOptions).catch(() => createImageBitmap(blob));
     signal?.throwIfAborted();
     const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
@@ -134,6 +161,7 @@ async function loadImage(
     canvas.height = Math.round(bitmap.height * scale);
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Unable to create canvas context');
+    context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = 'high';
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
@@ -141,6 +169,10 @@ async function loadImage(
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = anisotropy;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
     return {
       texture,
       video: null,
@@ -159,7 +191,11 @@ async function loadImage(
   }
 }
 
-function loadVideo(item: MediaItem, signal?: AbortSignal): Promise<LoadedMedia> {
+function loadVideo(
+  item: MediaItem,
+  anisotropy: number,
+  signal?: AbortSignal,
+): Promise<LoadedMedia> {
   const video = document.createElement('video');
   const objectUrl = item.blob ? URL.createObjectURL(item.blob) : null;
   if (!objectUrl) video.crossOrigin = 'anonymous';
@@ -200,6 +236,10 @@ function loadVideo(item: MediaItem, signal?: AbortSignal): Promise<LoadedMedia> 
       signal?.removeEventListener('abort', onAbort);
       texture = new THREE.VideoTexture(video);
       texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = anisotropy;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
       texture.needsUpdate = true;
       video.addEventListener('seeked', onSeeked, { once: true });
       video.currentTime = Math.min(1, (video.duration || 0) / 10);

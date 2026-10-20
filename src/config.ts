@@ -72,11 +72,11 @@ export const CONFIG: MuseumConfig = {
     videoPlayDistance: 13,
   },
   player: {
-    speed: 3.4,
-    sprintMultiplier: 1.8,
+    speed: 3.0,
+    sprintMultiplier: 1.65,
     eyeHeight: 1.65,
     radius: 0.4,
-    sensitivity: 0.0021,
+    sensitivity: 0.00115,
   },
   tour: {
     secondsPerStop: 7,

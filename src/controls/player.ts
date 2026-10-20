@@ -1,7 +1,14 @@
 import * as THREE from 'three';
 import type { Vector3Tuple } from '../types.ts';
 
-const PITCH_LIMIT = Math.PI * 0.47;
+const PITCH_LIMIT = Math.PI * 0.44;
+const PITCH_SENSITIVITY_RATIO = 0.72;
+const MAX_MOUSE_DELTA = 42;
+const WARP_SPIKE_THRESHOLD = 220;
+const LOOK_DAMPING = 20;
+const ACCEL_DAMPING = 8.5;
+const STOP_DAMPING = 12;
+const HEAD_BOB_AMPLITUDE = 0.011;
 
 export interface CameraPose {
   position: Vector3Tuple;
@@ -52,7 +59,7 @@ export interface PlayerHandle {
   onMouseMove(event: MouseMovement): void;
 }
 
-/** First-person pointer-lock controller with touch input, sliding and head bob. */
+/** First-person pointer-lock controller with damped look, touch input, sliding and subtle head bob. */
 export class PlayerController implements PlayerHandle {
   readonly camera: THREE.Camera;
   readonly canvas: HTMLCanvasElement | null;
@@ -68,6 +75,9 @@ export class PlayerController implements PlayerHandle {
   private readonly standPosition = new THREE.Vector3();
   private readonly wish = new THREE.Vector3();
   private readonly next = new THREE.Vector3();
+  private targetYaw = 0;
+  private targetPitch = 0;
+  private skipNextMouseSpike = false;
   private bob = 0;
   private seated = false;
   private collides: (position: THREE.Vector3) => boolean;
@@ -123,15 +133,28 @@ export class PlayerController implements PlayerHandle {
   resetPose(start: CameraPose): void {
     this.camera.position.fromArray(start.position);
     this.euler.set(0, start.yaw, 0, 'YXZ');
+    this.targetYaw = start.yaw;
+    this.targetPitch = 0;
     this.camera.quaternion.setFromEuler(this.euler);
     this.bob = 0;
   }
 
   lock(): void {
     if (this.touchEnabled || this.locked || !this.canvas) return;
-    const result = this.canvas.requestPointerLock();
-    if (result instanceof Promise) {
-      void result.catch(() => undefined);
+    const requestLock = this.canvas.requestPointerLock.bind(this.canvas) as (
+      options?: PointerLockOptions,
+    ) => Promise<void> | undefined;
+    try {
+      const result = requestLock({ unadjustedMovement: true });
+      if (result instanceof Promise) {
+        void result.catch(() => {
+          const fallback = this.canvas?.requestPointerLock();
+          if (fallback instanceof Promise) void fallback.catch(() => undefined);
+        });
+      }
+    } catch {
+      const fallback = this.canvas.requestPointerLock();
+      if (fallback instanceof Promise) void fallback.catch(() => undefined);
     }
   }
 
@@ -164,10 +187,15 @@ export class PlayerController implements PlayerHandle {
     this.touchMove.x = 0;
     this.touchMove.z = 0;
     this.velocity.set(0, 0, 0);
+    this.targetYaw = this.euler.y;
+    this.targetPitch = this.euler.x;
   }
 
   private handleLockChange(): void {
     if (this.locked) {
+      this.skipNextMouseSpike = true;
+      this.targetYaw = this.euler.y;
+      this.targetPitch = this.euler.x;
       document.addEventListener('mousemove', this.moveListener);
       document.addEventListener('keydown', this.keyDownListener);
       document.addEventListener('keyup', this.keyUpListener);
@@ -184,6 +212,8 @@ export class PlayerController implements PlayerHandle {
   syncFromCamera(): void {
     this.euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
     this.euler.z = 0;
+    this.targetYaw = this.euler.y;
+    this.targetPitch = this.euler.x;
     this.camera.quaternion.setFromEuler(this.euler);
     this.camera.position.y = this.options.eyeHeight;
   }
@@ -195,6 +225,8 @@ export class PlayerController implements PlayerHandle {
     this.velocity.set(0, 0, 0);
     this.camera.position.copy(position);
     this.euler.set(-0.04, yaw, 0, 'YXZ');
+    this.targetYaw = yaw;
+    this.targetPitch = -0.04;
     this.camera.quaternion.setFromEuler(this.euler);
   }
 
@@ -207,18 +239,48 @@ export class PlayerController implements PlayerHandle {
 
   onMouseMove(event: MouseMovement): void {
     if (!this.enabled || (!this.locked && !this.touchEnabled)) return;
+    const rawX = Number.isFinite(event.movementX) ? event.movementX : 0;
+    const rawY = Number.isFinite(event.movementY) ? event.movementY : 0;
+
+    // Filter out browser pointer-lock cursor-centering warp spikes.
+    if (Math.abs(rawX) > WARP_SPIKE_THRESHOLD || Math.abs(rawY) > WARP_SPIKE_THRESHOLD) {
+      this.skipNextMouseSpike = false;
+      return;
+    }
+    if (this.skipNextMouseSpike) {
+      this.skipNextMouseSpike = false;
+      if (Math.abs(rawX) > 28 || Math.abs(rawY) > 28) return;
+    }
+
+    const clampedX = THREE.MathUtils.clamp(rawX, -MAX_MOUSE_DELTA, MAX_MOUSE_DELTA);
+    const clampedY = THREE.MathUtils.clamp(rawY, -MAX_MOUSE_DELTA, MAX_MOUSE_DELTA);
     const sensitivity = this.options.sensitivity;
-    this.euler.y -= event.movementX * sensitivity;
-    this.euler.x = THREE.MathUtils.clamp(
-      this.euler.x - event.movementY * sensitivity,
+
+    this.targetYaw -= clampedX * sensitivity;
+    this.targetPitch = THREE.MathUtils.clamp(
+      this.targetPitch - clampedY * sensitivity * PITCH_SENSITIVITY_RATIO,
       -PITCH_LIMIT,
       PITCH_LIMIT,
     );
-    this.camera.quaternion.setFromEuler(this.euler);
   }
 
   update(dt: number): void {
     if (!this.enabled) return;
+
+    // Smoothly damp camera look rotation toward targetYaw / targetPitch.
+    const lookBlend = 1 - Math.exp(-dt * LOOK_DAMPING);
+    const yawDiff = this.targetYaw - this.euler.y;
+    const pitchDiff = this.targetPitch - this.euler.x;
+    if (Math.abs(yawDiff) > 1e-5 || Math.abs(pitchDiff) > 1e-5) {
+      this.euler.y += yawDiff * lookBlend;
+      this.euler.x = THREE.MathUtils.clamp(
+        this.euler.x + pitchDiff * lookBlend,
+        -PITCH_LIMIT,
+        PITCH_LIMIT,
+      );
+      this.camera.quaternion.setFromEuler(this.euler);
+    }
+
     const active = this.active;
     const x = active
       ? this.touchMove.x +
@@ -239,11 +301,13 @@ export class PlayerController implements PlayerHandle {
     const sprint =
       this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? this.options.sprintMultiplier : 1;
     this.wish.set(x, 0, z);
-    if (this.wish.lengthSq() > 0) {
+    const hasInput = this.wish.lengthSq() > 0;
+    if (hasInput) {
       this.wish.clampLength(0, 1).applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.euler.y);
     }
     this.wish.multiplyScalar(this.options.speed * sprint);
-    this.velocity.lerp(this.wish, 1 - Math.exp(-dt * 10));
+    const moveDamping = hasInput ? ACCEL_DAMPING : STOP_DAMPING;
+    this.velocity.lerp(this.wish, 1 - Math.exp(-dt * moveDamping));
     if (this.velocity.lengthSq() < 1e-5) return;
 
     const position = this.camera.position;
@@ -254,9 +318,10 @@ export class PlayerController implements PlayerHandle {
     }
 
     const speed = Math.hypot(this.velocity.x, this.velocity.z);
-    this.bob += dt * speed * 2.2;
+    this.bob += dt * speed * 1.9;
     position.y =
-      this.options.eyeHeight + Math.sin(this.bob) * 0.025 * Math.min(1, speed / this.options.speed);
+      this.options.eyeHeight +
+      Math.sin(this.bob) * HEAD_BOB_AMPLITUDE * Math.min(1, speed / this.options.speed);
   }
 
   private tryMove(position: THREE.Vector3, dx: number, dz: number): boolean {
